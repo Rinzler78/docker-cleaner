@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-container-cleanup.sh - Test docker-cleaner Docker image on local host
+# 11-12-test-container-cleanup.sh - Test docker-cleaner Docker image on local host
 
 set -euo pipefail
 
@@ -74,9 +74,9 @@ cleanup_on_exit() {
     # Clean test resources
     echo "Removing test resources..."
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1 || true
+        ./tests/03-cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1 || true
     else
-        ./tests/cleanup-test-resources.sh >/dev/null 2>&1 || true
+        ./tests/03-cleanup-test-resources.sh >/dev/null 2>&1 || true
     fi
 
     # Remove test image
@@ -222,9 +222,9 @@ test_default_settings() {
     # Setup
     echo "Creating test resources..."
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
 
     local BEFORE_RUNNING=$(count_running_containers)
@@ -261,9 +261,9 @@ test_default_settings() {
 
     # Cleanup for next test
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/cleanup-test-resources.sh >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh >/dev/null 2>&1
     fi
 
     echo ""
@@ -276,9 +276,9 @@ test_aggressive_settings() {
     # Setup
     echo "Creating test resources..."
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
 
     local BEFORE_RUNNING=$(count_running_containers)
@@ -318,9 +318,9 @@ test_aggressive_settings() {
 
     # Cleanup for next test
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/cleanup-test-resources.sh >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh >/dev/null 2>&1
     fi
 
     echo ""
@@ -351,9 +351,9 @@ test_error_handling() {
 
     # Setup resources
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
 
     local BEFORE_STOPPED=$(count_stopped_containers)
@@ -372,9 +372,9 @@ test_error_handling() {
 
     # Cleanup
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/cleanup-test-resources.sh >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh >/dev/null 2>&1
     fi
 
     echo ""
@@ -387,9 +387,9 @@ test_host_cleanup() {
     # Setup resources on host
     echo "Creating test resources on host..."
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
 
     local BEFORE_STOPPED=$(count_stopped_containers)

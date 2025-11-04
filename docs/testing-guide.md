@@ -52,43 +52,43 @@ All tests use label-based resource isolation (`test-cleanup=true`) to ensure pro
 
 ```bash
 # Run complete test suite (local + container + remote)
-./tests/run-all-tests.sh
+./tests/99-run-all-tests.sh
 ```
 
 ### Run Specific Test Types
 
 ```bash
 # Run only local script tests
-./tests/run-all-tests.sh --only-local
+./tests/99-run-all-tests.sh --only-local
 
 # Run only container tests
-./tests/run-all-tests.sh --only-container
+./tests/99-run-all-tests.sh --only-container
 
 # Run only remote context tests
-./tests/run-all-tests.sh --only-remote
+./tests/99-run-all-tests.sh --only-remote
 
 # Skip specific test types
-./tests/run-all-tests.sh --skip-remote
+./tests/99-run-all-tests.sh --skip-remote
 ```
 
 ### Run Tests on Specific Context
 
 ```bash
 # Test on a specific Docker context
-./tests/run-all-tests.sh --context my-remote-host
+./tests/99-run-all-tests.sh --context my-remote-host
 ```
 
 ## Test Scripts
 
 ### Foundation Scripts
 
-#### `setup-test-resources.sh`
+#### `01-setup-test-resources.sh`
 
 Creates test Docker resources for cleanup testing.
 
 **Usage:**
 ```bash
-./tests/setup-test-resources.sh [--context <name>]
+./tests/01-setup-test-resources.sh [--context <name>]
 ```
 
 **Resources Created:**
@@ -105,19 +105,19 @@ Creates test Docker resources for cleanup testing.
 **Examples:**
 ```bash
 # Create resources on default context
-./tests/setup-test-resources.sh
+./tests/01-setup-test-resources.sh
 
 # Create resources on remote context
-./tests/setup-test-resources.sh --context remote-nas
+./tests/01-setup-test-resources.sh --context remote-nas
 ```
 
-#### `cleanup-test-resources.sh`
+#### `03-cleanup-test-resources.sh`
 
-Removes all test resources created by `setup-test-resources.sh`.
+Removes all test resources created by `01-setup-test-resources.sh`.
 
 **Usage:**
 ```bash
-./tests/cleanup-test-resources.sh [--context <name>]
+./tests/03-cleanup-test-resources.sh [--context <name>]
 ```
 
 **Safety:**
@@ -128,19 +128,19 @@ Removes all test resources created by `setup-test-resources.sh`.
 **Examples:**
 ```bash
 # Cleanup resources on default context
-./tests/cleanup-test-resources.sh
+./tests/03-cleanup-test-resources.sh
 
 # Cleanup resources on remote context
-./tests/cleanup-test-resources.sh --context remote-nas
+./tests/03-cleanup-test-resources.sh --context remote-nas
 ```
 
-#### `validate-cleanup.sh`
+#### `02-validate-cleanup.sh`
 
 Validates cleanup operations with before/after resource counting.
 
 **Usage:**
 ```bash
-./tests/validate-cleanup.sh [--before|--after] [--context <name>]
+./tests/02-validate-cleanup.sh [--before|--after] [--context <name>]
 ```
 
 **Modes:**
@@ -151,27 +151,27 @@ Validates cleanup operations with before/after resource counting.
 **Examples:**
 ```bash
 # Full validation test
-./tests/validate-cleanup.sh
+./tests/02-validate-cleanup.sh
 
 # Before cleanup validation
-./tests/validate-cleanup.sh --before
+./tests/02-validate-cleanup.sh --before
 
 # After cleanup validation
-./tests/validate-cleanup.sh --after
+./tests/02-validate-cleanup.sh --after
 
 # Validate on remote context
-./tests/validate-cleanup.sh --context remote-nas
+./tests/02-validate-cleanup.sh --context remote-nas
 ```
 
 ### Local Script Testing
 
-#### `test-local-cleanup.sh`
+#### `11-test-local-cleanup.sh`
 
 Tests cleanup script execution directly in terminal.
 
 **Usage:**
 ```bash
-./tests/test-local-cleanup.sh [OPTIONS]
+./tests/11-test-local-cleanup.sh [OPTIONS]
 
 Options:
   --dry-run           Test in dry-run mode (no deletions)
@@ -190,27 +190,27 @@ Options:
 **Examples:**
 ```bash
 # Test default cleanup
-./tests/test-local-cleanup.sh
+./tests/11-test-local-cleanup.sh
 
 # Test aggressive cleanup
-./tests/test-local-cleanup.sh --prune-all --prune-volumes
+./tests/11-test-local-cleanup.sh --prune-all --prune-volumes
 
 # Test dry-run mode
-./tests/test-local-cleanup.sh --dry-run
+./tests/11-test-local-cleanup.sh --dry-run
 
 # Test on remote context
-./tests/test-local-cleanup.sh --context remote-dev
+./tests/11-test-local-cleanup.sh --context remote-dev
 ```
 
 ### Container Testing
 
-#### `test-container-cleanup.sh`
+#### `12-test-container-cleanup.sh`
 
 Tests docker-cleaner Docker image on local or remote host.
 
 **Usage:**
 ```bash
-./tests/test-container-cleanup.sh [OPTIONS]
+./tests/12-test-container-cleanup.sh [OPTIONS]
 
 Options:
   --mode <mode>       Test mode: all|default|aggressive|errors|host
@@ -237,30 +237,30 @@ Options:
 **Examples:**
 ```bash
 # Run all container tests
-./tests/test-container-cleanup.sh
+./tests/12-test-container-cleanup.sh
 
 # Test default settings only
-./tests/test-container-cleanup.sh --mode default
+./tests/12-test-container-cleanup.sh --mode default
 
 # Test aggressive settings
-./tests/test-container-cleanup.sh --mode aggressive
+./tests/12-test-container-cleanup.sh --mode aggressive
 
 # Test error handling
-./tests/test-container-cleanup.sh --mode errors
+./tests/12-test-container-cleanup.sh --mode errors
 
 # Test on remote context
-./tests/test-container-cleanup.sh --context remote-nas
+./tests/12-test-container-cleanup.sh --context remote-nas
 ```
 
 ### Remote Context Testing
 
-#### `test-remote-contexts.sh`
+#### `13-test-remote-contexts.sh`
 
 Tests docker-cleaner on remote Docker hosts via Docker contexts.
 
 **Usage:**
 ```bash
-./tests/test-remote-contexts.sh [OPTIONS]
+./tests/13-test-remote-contexts.sh [OPTIONS]
 
 Options:
   --context <name>          Test specific context
@@ -280,13 +280,13 @@ Options:
 **Examples:**
 ```bash
 # Test all available contexts
-./tests/test-remote-contexts.sh
+./tests/13-test-remote-contexts.sh
 
 # Test specific context
-./tests/test-remote-contexts.sh --context remote-nas
+./tests/13-test-remote-contexts.sh --context remote-nas
 
 # Test multiple contexts
-./tests/test-remote-contexts.sh --contexts "remote-nas,remote-dev"
+./tests/13-test-remote-contexts.sh --contexts "remote-nas,remote-dev"
 ```
 
 **Prerequisites:**
@@ -296,13 +296,13 @@ Options:
 
 ### Master Test Runner
 
-#### `run-all-tests.sh`
+#### `99-run-all-tests.sh`
 
 Orchestrates all test types with comprehensive reporting.
 
 **Usage:**
 ```bash
-./tests/run-all-tests.sh [OPTIONS]
+./tests/99-run-all-tests.sh [OPTIONS]
 
 Options:
   --skip-local        Skip local script tests
@@ -324,16 +324,16 @@ Options:
 **Examples:**
 ```bash
 # Run all tests
-./tests/run-all-tests.sh
+./tests/99-run-all-tests.sh
 
 # Run only local and container tests
-./tests/run-all-tests.sh --skip-remote
+./tests/99-run-all-tests.sh --skip-remote
 
 # Run only remote tests
-./tests/run-all-tests.sh --only-remote
+./tests/99-run-all-tests.sh --only-remote
 
 # Run all tests on specific context
-./tests/run-all-tests.sh --context remote-dev
+./tests/99-run-all-tests.sh --context remote-dev
 ```
 
 ## Docker Context Setup
@@ -415,10 +415,10 @@ docker context use default
 **Solution:**
 Manually cleanup test resources:
 ```bash
-./tests/cleanup-test-resources.sh
+./tests/03-cleanup-test-resources.sh
 
 # For specific context:
-./tests/cleanup-test-resources.sh --context remote-nas
+./tests/03-cleanup-test-resources.sh --context remote-nas
 ```
 
 ### Issue: Context switch fails during tests
@@ -470,14 +470,14 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Run local script tests
-        run: ./tests/run-all-tests.sh --only-local
+        run: ./tests/99-run-all-tests.sh --only-local
 
       - name: Run container tests
-        run: ./tests/run-all-tests.sh --only-container
+        run: ./tests/99-run-all-tests.sh --only-container
 
       - name: Cleanup test resources
         if: always()
-        run: ./tests/cleanup-test-resources.sh
+        run: ./tests/03-cleanup-test-resources.sh
 ```
 
 ### GitLab CI
@@ -495,7 +495,7 @@ test-local:
     - docker:dind
   script:
     - apk add --no-cache bash
-    - ./tests/run-all-tests.sh --only-local
+    - ./tests/99-run-all-tests.sh --only-local
 
 test-container:
   stage: test
@@ -504,7 +504,7 @@ test-container:
     - docker:dind
   script:
     - apk add --no-cache bash
-    - ./tests/run-all-tests.sh --only-container
+    - ./tests/99-run-all-tests.sh --only-container
 
 cleanup:
   stage: test
@@ -514,7 +514,7 @@ cleanup:
     - docker:dind
   script:
     - apk add --no-cache bash
-    - ./tests/cleanup-test-resources.sh
+    - ./tests/03-cleanup-test-resources.sh
 ```
 
 ### Jenkins
@@ -528,20 +528,20 @@ pipeline {
     stages {
         stage('Test Local') {
             steps {
-                sh './tests/run-all-tests.sh --only-local'
+                sh './tests/99-run-all-tests.sh --only-local'
             }
         }
 
         stage('Test Container') {
             steps {
-                sh './tests/run-all-tests.sh --only-container'
+                sh './tests/99-run-all-tests.sh --only-container'
             }
         }
     }
 
     post {
         always {
-            sh './tests/cleanup-test-resources.sh'
+            sh './tests/03-cleanup-test-resources.sh'
         }
     }
 }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-remote-contexts.sh - Test docker-cleaner on remote Docker hosts via contexts
+# 11-13-test-remote-contexts.sh - Test docker-cleaner on remote Docker hosts via contexts
 
 set -euo pipefail
 
@@ -162,7 +162,7 @@ test_context() {
     echo -e "${BLUE}=== Phase 1: Setup Resources ===${NC}"
     echo "Creating test resources on $context_name..."
 
-    if ! ./tests/setup-test-resources.sh --context "$context_name" >/dev/null 2>&1; then
+    if ! ./tests/01-setup-test-resources.sh --context "$context_name" >/dev/null 2>&1; then
         echo -e "${RED}✗ Failed to create test resources on $context_name${NC}"
         CONTEXT_RESULTS["$context_name"]="FAILED - Setup failed"
         FAILED_CONTEXTS+=("$context_name")
@@ -285,7 +285,7 @@ test_context() {
     echo -e "${BLUE}=== Phase 4: Cleanup ===${NC}"
     echo "Cleaning up test resources on $context_name..."
 
-    ./tests/cleanup-test-resources.sh --context "$context_name" >/dev/null 2>&1 || true
+    ./tests/03-cleanup-test-resources.sh --context "$context_name" >/dev/null 2>&1 || true
 
     echo -e "${GREEN}✓ Test resources cleaned${NC}"
 

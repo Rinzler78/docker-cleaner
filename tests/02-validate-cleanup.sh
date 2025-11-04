@@ -1,5 +1,5 @@
 #!/bin/bash
-# validate-cleanup.sh - Validate that cleanup operations work correctly
+# 02-02-validate-cleanup.sh - Validate that cleanup operations work correctly
 
 set -euo pipefail
 
@@ -244,9 +244,9 @@ validate_full() {
     # Setup test resources
     echo -e "${BLUE}Setting up test resources...${NC}"
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
     echo -e "${GREEN}✓ Test resources created${NC}"
     echo ""
@@ -296,9 +296,9 @@ validate_full() {
     echo ""
     echo -e "${BLUE}Test 6: Label-based protection...${NC}"
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
 
     BEFORE_PROTECTED=$(count_protected_resources)
@@ -314,9 +314,9 @@ validate_full() {
     echo ""
     echo -e "${BLUE}Cleaning up test resources...${NC}"
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/cleanup-test-resources.sh >/dev/null 2>&1
+        ./tests/03-cleanup-test-resources.sh >/dev/null 2>&1
     fi
 
     # Summary

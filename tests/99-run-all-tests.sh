@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-all-tests.sh - Master test runner for docker-cleaner
+# 99-run-all-tests.sh - Master test runner for docker-cleaner
 
 set -euo pipefail
 
@@ -105,9 +105,9 @@ run_local_tests() {
     # Test 1: Default settings
     echo -e "${YELLOW}Test 1: Default cleanup settings${NC}"
     if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/test-local-cleanup.sh --context "$TEST_CONTEXT" || exit_code=$?
+        ./tests/11-test-local-cleanup.sh --context "$TEST_CONTEXT" || exit_code=$?
     else
-        ./tests/test-local-cleanup.sh || exit_code=$?
+        ./tests/11-test-local-cleanup.sh || exit_code=$?
     fi
 
     if [ $exit_code -ne 0 ]; then
@@ -121,9 +121,9 @@ run_local_tests() {
     # Test 2: Aggressive settings
     echo -e "${YELLOW}Test 2: Aggressive cleanup settings${NC}"
     if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/test-local-cleanup.sh --prune-all --prune-volumes --context "$TEST_CONTEXT" || exit_code=$?
+        ./tests/11-test-local-cleanup.sh --prune-all --prune-volumes --context "$TEST_CONTEXT" || exit_code=$?
     else
-        ./tests/test-local-cleanup.sh --prune-all --prune-volumes || exit_code=$?
+        ./tests/11-test-local-cleanup.sh --prune-all --prune-volumes || exit_code=$?
     fi
 
     if [ $exit_code -ne 0 ]; then
@@ -137,9 +137,9 @@ run_local_tests() {
     # Test 3: Dry-run mode
     echo -e "${YELLOW}Test 3: Dry-run mode${NC}"
     if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/test-local-cleanup.sh --dry-run --context "$TEST_CONTEXT" || exit_code=$?
+        ./tests/11-test-local-cleanup.sh --dry-run --context "$TEST_CONTEXT" || exit_code=$?
     else
-        ./tests/test-local-cleanup.sh --dry-run || exit_code=$?
+        ./tests/11-test-local-cleanup.sh --dry-run || exit_code=$?
     fi
 
     if [ $exit_code -ne 0 ]; then
@@ -164,9 +164,9 @@ run_container_tests() {
     local exit_code=0
 
     if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/test-container-cleanup.sh --mode all --context "$TEST_CONTEXT" || exit_code=$?
+        ./tests/12-test-container-cleanup.sh --mode all --context "$TEST_CONTEXT" || exit_code=$?
     else
-        ./tests/test-container-cleanup.sh --mode all || exit_code=$?
+        ./tests/12-test-container-cleanup.sh --mode all || exit_code=$?
     fi
 
     if [ $exit_code -ne 0 ]; then
@@ -204,9 +204,9 @@ run_remote_tests() {
     local exit_code=0
 
     if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/test-remote-contexts.sh --context "$TEST_CONTEXT" || exit_code=$?
+        ./tests/13-test-remote-contexts.sh --context "$TEST_CONTEXT" || exit_code=$?
     else
-        ./tests/test-remote-contexts.sh || exit_code=$?
+        ./tests/13-test-remote-contexts.sh || exit_code=$?
     fi
 
     if [ $exit_code -ne 0 ]; then

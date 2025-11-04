@@ -67,7 +67,7 @@ All changes must include appropriate tests:
 
 Run the test suite before submitting:
 ```bash
-./tests/run-all-tests.sh
+./tests/99-run-all-tests.sh
 ```
 
 For detailed testing documentation, see [docs/testing-guide.md](docs/testing-guide.md).

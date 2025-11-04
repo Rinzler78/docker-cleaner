@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-local-cleanup.sh - Test cleanup script execution in local terminal
+# 11-test-local-cleanup.sh - Test cleanup script execution in local terminal
 
 set -euo pipefail
 
@@ -79,9 +79,9 @@ cleanup_on_exit() {
     # Clean test resources
     echo "Removing test resources..."
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1 || true
+        ./tests/03-cleanup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1 || true
     else
-        ./tests/cleanup-test-resources.sh >/dev/null 2>&1 || true
+        ./tests/03-cleanup-test-resources.sh >/dev/null 2>&1 || true
     fi
     echo -e "${GREEN}✓ Test resources cleaned${NC}"
 
@@ -223,9 +223,9 @@ main() {
     echo -e "${BLUE}=== Phase 1: Setup ===${NC}"
     echo "Creating test resources..."
     if [ -n "$TARGET_CONTEXT" ]; then
-        ./tests/setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh --context "$TARGET_CONTEXT" >/dev/null 2>&1
     else
-        ./tests/setup-test-resources.sh >/dev/null 2>&1
+        ./tests/01-setup-test-resources.sh >/dev/null 2>&1
     fi
     echo -e "${GREEN}✓ Test resources created${NC}"
     echo ""

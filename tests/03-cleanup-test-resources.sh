@@ -1,5 +1,5 @@
 #!/bin/bash
-# cleanup-test-resources.sh - Clean up all test resources created by setup-test-resources.sh
+# 03-cleanup-test-resources.sh - Clean up all test resources created by setup-test-resources.sh
 
 set -euo pipefail
 

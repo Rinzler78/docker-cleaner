@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup-test-resources.sh - Create Docker resources for testing cleanup operations
+# 01-setup-test-resources.sh - Create Docker resources for testing cleanup operations
 
 set -euo pipefail
 
@@ -257,9 +257,9 @@ print_summary() {
     echo "Protected resources are labeled with: keep=true"
     echo ""
     if [ -n "$TARGET_CONTEXT" ]; then
-        echo "To clean up: ./tests/cleanup-test-resources.sh --context $TARGET_CONTEXT"
+        echo "To clean up: ./tests/03-cleanup-test-resources.sh --context $TARGET_CONTEXT"
     else
-        echo "To clean up: ./tests/cleanup-test-resources.sh"
+        echo "To clean up: ./tests/03-cleanup-test-resources.sh"
     fi
     echo "To test cleanup: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -e DRY_RUN=true docker-cleaner"
 }

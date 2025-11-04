@@ -426,39 +426,39 @@ docker-cleaner includes a comprehensive testing framework that validates cleanup
 
 ```bash
 # Run complete test suite (local + container + remote)
-./tests/run-all-tests.sh
+./tests/99-run-all-tests.sh
 
 # Run only local script tests
-./tests/run-all-tests.sh --only-local
+./tests/99-run-all-tests.sh --only-local
 
 # Run only container tests
-./tests/run-all-tests.sh --only-container
+./tests/99-run-all-tests.sh --only-container
 
 # Run specific test types
-./tests/test-local-cleanup.sh           # Local script testing
-./tests/test-container-cleanup.sh       # Container testing
-./tests/test-remote-contexts.sh         # Remote context testing
+./tests/11-test-local-cleanup.sh           # Local script testing
+./tests/12-test-container-cleanup.sh       # Container testing
+./tests/13-test-remote-contexts.sh         # Remote context testing
 
 # Test with different configurations
-./tests/test-local-cleanup.sh --prune-all --prune-volumes
-./tests/test-local-cleanup.sh --dry-run
+./tests/11-test-local-cleanup.sh --prune-all --prune-volumes
+./tests/11-test-local-cleanup.sh --dry-run
 
 # Test on specific Docker context
-./tests/run-all-tests.sh --context remote-nas
+./tests/99-run-all-tests.sh --context remote-nas
 ```
 
 #### Test Resource Management
 
 ```bash
 # Create test resources for manual testing
-./tests/setup-test-resources.sh
+./tests/01-setup-test-resources.sh
 
 # Cleanup test resources
-./tests/cleanup-test-resources.sh
+./tests/03-cleanup-test-resources.sh
 
 # Validate cleanup operations
-./tests/validate-cleanup.sh --before  # Before cleanup
-./tests/validate-cleanup.sh --after   # After cleanup
+./tests/02-validate-cleanup.sh --before  # Before cleanup
+./tests/02-validate-cleanup.sh --after   # After cleanup
 ```
 
 For detailed testing documentation, see [docs/testing-guide.md](docs/testing-guide.md).
