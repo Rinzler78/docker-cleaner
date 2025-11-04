@@ -406,6 +406,43 @@ Expected execution times vary based on resource count:
 
 Memory usage: ~50MB peak
 
+## Docker Hub
+
+The docker-cleaner image is automatically published to Docker Hub with each release:
+
+```bash
+# Pull latest version
+docker pull <your-dockerhub-username>/docker-cleaner:latest
+
+# Pull specific version
+docker pull <your-dockerhub-username>/docker-cleaner:v1.0.0
+
+# Run from Docker Hub
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  <your-dockerhub-username>/docker-cleaner:latest
+```
+
+### Automated Releases
+
+Releases are triggered automatically when you push a version tag:
+
+```bash
+# Create and push a release tag
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
+This triggers a GitHub Action that:
+- Builds multi-architecture images (amd64 and arm64)
+- Pushes to Docker Hub with semantic version tags
+- Updates Docker Hub description with README content
+
+### Required Docker Hub Secrets
+
+To enable automated publishing, add these secrets to your GitHub repository:
+- `DOCKERHUB_USERNAME`: Your Docker Hub username
+- `DOCKERHUB_TOKEN`: Docker Hub access token (not your password - generate at hub.docker.com/settings/security)
+
 ## Development
 
 ### Building
