@@ -437,11 +437,22 @@ This triggers a GitHub Action that:
 - Pushes to Docker Hub with semantic version tags
 - Updates Docker Hub description with README content
 
-### Required Docker Hub Secrets
+### Required Docker Hub Setup
 
-To enable automated publishing, add these secrets to your GitHub repository:
-- `DOCKERHUB_USERNAME`: Your Docker Hub username
-- `DOCKERHUB_TOKEN`: Docker Hub access token (not your password - generate at hub.docker.com/settings/security)
+Before the first automated release, you must:
+
+1. **Create the Docker Hub repository** (one-time setup):
+   - Go to https://hub.docker.com/
+   - Click "Create Repository"
+   - Name: `docker-cleaner`
+   - Visibility: Public (or Private if you have a paid plan)
+   - Click "Create"
+
+2. **Add GitHub Secrets** to your repository (Settings > Secrets and variables > Actions):
+   - `DOCKERHUB_USERNAME`: Your Docker Hub username
+   - `DOCKERHUB_TOKEN`: Docker Hub access token (generate at hub.docker.com/settings/security)
+
+   Note: The token needs write permissions to push images.
 
 ## Development
 
