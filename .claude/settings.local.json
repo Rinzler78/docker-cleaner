@@ -13,7 +13,9 @@
       "Bash(README.md)",
       "Bash(__NEW_LINE__ echo \"Updated: README.md\")",
       "Bash(CONTRIBUTING.md)",
-      "Bash(__NEW_LINE__ echo \"Updated: CONTRIBUTING.md\")"
+      "Bash(__NEW_LINE__ echo \"Updated: CONTRIBUTING.md\")",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click"
     ],
     "deny": [],
     "ask": []
