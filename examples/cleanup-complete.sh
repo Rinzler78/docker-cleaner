@@ -1,32 +1,32 @@
 #!/bin/bash
-# cleanup-complete.sh - Nettoyage COMPLET en 2 passes
+# cleanup-complete.sh - COMPLETE cleanup in 2 passes
 #
-# Docker vérifie l'utilisation des ressources AU MOMENT du prune.
-# Une première passe supprime les conteneurs stopped et leurs ressources.
-# Une deuxième passe supprime les images orphelines qui étaient référencées
-# par les conteneurs supprimés lors de la première passe.
+# Docker checks resource usage AT THE TIME of pruning.
+# The first pass removes stopped containers and their resources.
+# The second pass removes orphaned images that were referenced
+# by containers removed during the first pass.
 
 set -euo pipefail
 
 echo "==========================================="
-echo "  Docker Cleanup - 2 PASSES COMPLÈTES"
+echo "  Docker Cleanup - 2 COMPLETE PASSES"
 echo "==========================================="
 echo ""
-echo "Ce script exécute 2 nettoyages complets pour garantir"
-echo "que TOUTES les ressources inutilisées sont supprimées,"
-echo "y compris les images de base orphelines."
+echo "This script executes 2 complete cleanups to ensure"
+echo "that ALL unused resources are removed,"
+echo "including orphaned base images."
 echo ""
 
-# Option dry-run
+# Dry-run option
 DRY_RUN=${DRY_RUN:-false}
 
 if [ "$DRY_RUN" = "true" ]; then
-    echo "🔍 Mode DRY-RUN activé - Aucune suppression réelle"
+    echo "🔍 DRY-RUN mode enabled - No actual deletion"
     echo ""
 fi
 
 echo "=========================================="
-echo "PASSE 1: Nettoyage initial"
+echo "PASS 1: Initial cleanup"
 echo "=========================================="
 echo ""
 
@@ -45,11 +45,11 @@ docker run --rm \
 
 echo ""
 echo "=========================================="
-echo "PASSE 2: Nettoyage des images orphelines"
+echo "PASS 2: Orphaned images cleanup"
 echo "=========================================="
 echo ""
-echo "Les images qui étaient référencées par des conteneurs"
-echo "supprimés lors de la passe 1 vont maintenant être supprimées."
+echo "Images that were referenced by containers"
+echo "removed in pass 1 will now be removed."
 echo ""
 
 docker run --rm \
@@ -66,7 +66,7 @@ docker run --rm \
     docker-cleaner:latest
 
 echo ""
-echo "✅ Nettoyage complet terminé (2 passes)!"
+echo "✅ Complete cleanup finished (2 passes)!"
 echo ""
-echo "Pour tester sans suppression:"
+echo "To test without deletion:"
 echo "  DRY_RUN=true ./cleanup-complete.sh"

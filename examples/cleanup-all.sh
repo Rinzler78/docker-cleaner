@@ -1,32 +1,32 @@
 #!/bin/bash
-# cleanup-all.sh - Nettoyage COMPLET de Docker (conteneurs, images, volumes, networks, build cache)
+# cleanup-all.sh - COMPLETE Docker cleanup (containers, images, volumes, networks, build cache)
 
 set -euo pipefail
 
 echo "=========================================="
-echo "  Docker Cleanup - Nettoyage COMPLET"
+echo "  Docker Cleanup - COMPLETE CLEANUP"
 echo "=========================================="
 echo ""
-echo "Ce script va nettoyer:"
-echo "  ✓ Conteneurs arrêtés"
-echo "  ✓ Images inutilisées (toutes, pas seulement dangling)"
-echo "  ✓ Volumes inutilisés"
-echo "  ✓ Networks inutilisés"
+echo "This script will clean:"
+echo "  ✓ Stopped containers"
+echo "  ✓ Unused images (all, not just dangling)"
+echo "  ✓ Unused volumes"
+echo "  ✓ Unused networks"
 echo "  ✓ Build cache"
 echo ""
-echo "⚠️  ATTENTION: Les volumes seront SUPPRIMÉS DÉFINITIVEMENT"
-echo "⚠️  Les conteneurs en cours d'exécution seront PROTÉGÉS"
+echo "⚠️  WARNING: Volumes will be PERMANENTLY DELETED"
+echo "⚠️  Running containers will be PROTECTED"
 echo ""
 
-# Option dry-run
+# Dry-run option
 DRY_RUN=${DRY_RUN:-false}
 
 if [ "$DRY_RUN" = "true" ]; then
-    echo "🔍 Mode DRY-RUN activé - Aucune suppression réelle"
+    echo "🔍 DRY-RUN mode enabled - No actual deletion"
     echo ""
 fi
 
-# Exécuter le nettoyage
+# Execute cleanup
 docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -e PRUNE_ALL=true \
@@ -41,7 +41,7 @@ docker run --rm \
     docker-cleaner:latest
 
 echo ""
-echo "✅ Nettoyage terminé!"
+echo "✅ Cleanup completed!"
 echo ""
-echo "Pour nettoyer en mode test (sans suppression):"
+echo "To clean in test mode (without deletion):"
 echo "  DRY_RUN=true ./cleanup-all.sh"

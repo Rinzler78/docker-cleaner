@@ -20,15 +20,15 @@ Automated Docker cleanup container that reclaims disk space by removing unused c
 # Build the image
 docker build -t docker-cleaner .
 
-# 1. NETTOYAGE COMPLET - Nettoie TOUT (recommandé)
-# Supprime: conteneurs arrêtés, images inutilisées, volumes inutilisés, networks, cache
+# 1. COMPLETE CLEANUP - Cleans EVERYTHING (recommended)
+# Removes: stopped containers, unused images, unused volumes, networks, cache
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   -e PRUNE_ALL=true \
   -e PRUNE_VOLUMES=true \
   -e CLEANUP_VOLUMES=true \
   docker-cleaner
 
-# 2. Preview en mode DRY-RUN (tester avant de nettoyer)
+# 2. Preview with DRY-RUN mode (test before cleaning)
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   -e PRUNE_ALL=true \
   -e PRUNE_VOLUMES=true \
@@ -36,20 +36,20 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   -e DRY_RUN=true \
   docker-cleaner
 
-# 3. Nettoyage conservateur (par défaut - volumes protégés)
+# 3. Conservative cleanup (default - volumes protected)
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock docker-cleaner
 ```
 
 ### Using Docker Compose
 
 ```bash
-# FULL CLEANUP - Nettoie TOUT (recommandé)
+# FULL CLEANUP - Cleans EVERYTHING (recommended)
 docker-compose --profile full up docker-cleaner-full
 
-# Default cleanup (conservative - volumes protégés)
+# Default cleanup (conservative - volumes protected)
 docker-compose up docker-cleaner
 
-# Dry-run mode (preview sans suppression)
+# Dry-run mode (preview without deletion)
 docker-compose --profile dryrun up docker-cleaner-dryrun
 
 # Conservative cleanup
@@ -59,37 +59,37 @@ docker-compose --profile conservative up docker-cleaner-conservative
 docker-compose --profile aggressive up docker-cleaner-aggressive
 ```
 
-### Scripts Shell
+### Shell Scripts
 
-#### Nettoyage complet (1 passe)
+#### Complete cleanup (1 pass)
 
 ```bash
-# Nettoyage complet en une passe
+# Complete cleanup in one pass
 ./examples/cleanup-all.sh
 
-# Test en dry-run
+# Test with dry-run
 DRY_RUN=true ./examples/cleanup-all.sh
 ```
 
-#### Nettoyage complet garanti (2 passes)
+#### Complete guaranteed cleanup (2 passes)
 
-Pour supprimer TOUTES les ressources inutilisées, y compris les images orphelines :
+To remove ALL unused resources, including orphaned images:
 
 ```bash
-# Nettoyage en 2 passes (recommandé pour nettoyage maximum)
+# Cleanup in 2 passes (recommended for maximum cleanup)
 ./examples/cleanup-complete.sh
 
-# Test en dry-run
+# Test with dry-run
 DRY_RUN=true ./examples/cleanup-complete.sh
 ```
 
-La première passe supprime conteneurs, volumes, networks et build cache. La deuxième passe supprime les images qui sont devenues orphelines après suppression des conteneurs.
+The first pass removes containers, volumes, networks, and build cache. The second pass removes images that became orphaned after container deletion.
 
-## Niveaux de Nettoyage
+## Cleanup Levels
 
-### 🔥 FULL CLEANUP (Recommandé)
+### 🔥 FULL CLEANUP (Recommended)
 
-Nettoie **TOUT** sauf les conteneurs en cours d'exécution et les volumes en cours d'utilisation :
+Cleans **EVERYTHING** except running containers and volumes in use:
 
 ```bash
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
@@ -99,39 +99,39 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   docker-cleaner
 ```
 
-**Ce qui est supprimé** :
-- ✅ Conteneurs arrêtés (exited, created)
-- ✅ Images inutilisées (toutes, pas seulement dangling)
-- ✅ Volumes inutilisés (non montés par des conteneurs)
-- ✅ Networks inutilisés (non utilisés par des conteneurs)
-- ✅ Build cache (layers intermédiaires)
+**What gets removed**:
+- ✅ Stopped containers (exited, created)
+- ✅ Unused images (all, not just dangling)
+- ✅ Unused volumes (not mounted by containers)
+- ✅ Unused networks (not used by containers)
+- ✅ Build cache (intermediate layers)
 
-**Ce qui est protégé** :
-- ✅ Conteneurs en cours d'exécution (running)
-- ✅ Volumes montés par des conteneurs running
-- ✅ Networks utilisés par des conteneurs running
-- ✅ Images utilisées par des conteneurs running
+**What is protected**:
+- ✅ Running containers
+- ✅ Volumes mounted by running containers
+- ✅ Networks used by running containers
+- ✅ Images used by running containers
 
-⚠️ **Note importante** : Docker vérifie l'utilisation des images AU MOMENT du prune. Si vous avez des conteneurs stopped qui sont supprimés par le nettoyage, leurs images de base restent car elles étaient référencées au moment de la vérification. Pour supprimer ces images orphelines, exécutez simplement docker-cleaner une deuxième fois.
+⚠️ **Important note**: Docker checks image usage AT THE TIME of pruning. If you have stopped containers that are removed by cleanup, their base images remain because they were referenced at the time of verification. To remove these orphaned images, simply run docker-cleaner a second time.
 
-### 🛡️ Conservative (Par défaut)
+### 🛡️ Conservative (Default)
 
-Nettoyage conservateur qui protège les volumes :
+Conservative cleanup that protects volumes:
 
 ```bash
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock docker-cleaner
 ```
 
-**Ce qui est supprimé** :
-- ✅ Conteneurs arrêtés
-- ✅ Images dangling (sans tag)
-- ✅ Networks inutilisés
+**What gets removed**:
+- ✅ Stopped containers
+- ✅ Dangling images (untagged)
+- ✅ Unused networks
 - ✅ Build cache
 
-**Ce qui est protégé** :
-- ✅ TOUS les volumes (même inutilisés)
-- ✅ Images tagged (même inutilisées)
-- ✅ Conteneurs running
+**What is protected**:
+- ✅ ALL volumes (even unused)
+- ✅ Tagged images (even unused)
+- ✅ Running containers
 
 ## Configuration
 
