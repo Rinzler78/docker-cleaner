@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Configuration par défaut - Conservative (recommended)
+  docker-cleaner:
+    build: .
+    image: docker-cleaner:latest
+    container_name: docker-cleaner
+    volumes:
+      # Mount Docker socket for cleanup operations
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Core cleanup configuration
+      - PRUNE_ALL=false              # Remove all unused images (not just dangling)
+      - PRUNE_VOLUMES=false           # Include volumes in cleanup (DANGER)
+      - PRUNE_FORCE=true              # Skip confirmation prompts
+
+      # Selective operations
+      - CLEANUP_CONTAINERS=true       # Prune stopped containers
+      - CLEANUP_IMAGES=true           # Prune unused images
+      - CLEANUP_VOLUMES=false         # Prune unused volumes
+      - CLEANUP_NETWORKS=true         # Prune unused networks
+      - CLEANUP_BUILD_CACHE=true      # Prune build cache
+
+      # Filters
+      - PRUNE_FILTER_UNTIL=168h       # Remove resources older than 7 days
+      # - PRUNE_FILTER_LABEL=keep!=true  # Uncomment to filter by label
+
+      # Logging
+      - LOG_LEVEL=INFO                # DEBUG, INFO, WARN, ERROR
+      - LOG_FORMAT=text               # text or json
+      - QUIET=false                   # Minimal output
+
+      # Execution mode
+      - DRY_RUN=false                 # Preview without deleting
+    restart: "no"                     # One-shot execution
+
+  # FULL CLEANUP - Nettoie TOUT (conteneurs, images, volumes, networks, cache)
+  docker-cleaner-full:
+    build: .
+    image: docker-cleaner:latest
+    container_name: docker-cleaner-full
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PRUNE_ALL=true                # Remove ALL unused images
+      - PRUNE_VOLUMES=true            # Remove unused volumes ⚠️
+      - CLEANUP_CONTAINERS=true       # Remove stopped containers
+      - CLEANUP_IMAGES=true           # Remove unused images
+      - CLEANUP_VOLUMES=true          # Remove unused volumes
+      - CLEANUP_NETWORKS=true         # Remove unused networks
+      - CLEANUP_BUILD_CACHE=true      # Remove build cache
+      - LOG_LEVEL=INFO
+    restart: "no"
+    profiles:
+      - full                          # Use with: docker-compose --profile full up
+
+  # Example: Aggressive cleanup (use with caution)
+  docker-cleaner-aggressive:
+    build: .
+    image: docker-cleaner:latest
+    container_name: docker-cleaner-aggressive
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PRUNE_ALL=true                # Remove ALL unused images
+      - PRUNE_VOLUMES=true            # Remove unused volumes
+      - PRUNE_FILTER_UNTIL=24h        # Only resources older than 24h
+      - LOG_LEVEL=INFO
+    restart: "no"
+    profiles:
+      - aggressive                    # Only run with: docker-compose --profile aggressive up
+
+  # Example: Conservative cleanup (safe defaults)
+  docker-cleaner-conservative:
+    build: .
+    image: docker-cleaner:latest
+    container_name: docker-cleaner-conservative
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PRUNE_ALL=false               # Only dangling images
+      - PRUNE_VOLUMES=false           # No volumes
+      - PRUNE_FILTER_UNTIL=720h       # 30 days
+      - CLEANUP_BUILD_CACHE=false     # Keep build cache
+      - LOG_LEVEL=INFO
+    restart: "no"
+    profiles:
+      - conservative
+
+  # Example: Dry-run mode for testing
+  docker-cleaner-dryrun:
+    build: .
+    image: docker-cleaner:latest
+    container_name: docker-cleaner-dryrun
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PRUNE_ALL=true
+      - PRUNE_VOLUMES=true
+      - DRY_RUN=true                  # Preview only, no deletions
+      - LOG_LEVEL=DEBUG
+    restart: "no"
+    profiles:
+      - dryrun
