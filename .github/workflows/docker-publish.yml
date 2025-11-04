@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ github.repository_owner }}/${{ github.event.repository.name }}
 
 jobs:
   build-and-push:
@@ -26,6 +26,10 @@ jobs:
         run: |
           TAG_NAME="${{ github.ref_name }}"
 
+          # Convert repository name to lowercase for Docker Hub compatibility
+          REPO_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "docker_repo=${REPO_LOWER}" >> $GITHUB_OUTPUT
+
           # Remove 'v' prefix for processing
           VERSION="${TAG_NAME#v}"
 
@@ -33,8 +37,8 @@ jobs:
           if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Four-digit version detected: $VERSION"
             # For 4-digit versions, use as-is without semver parsing
-            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG_NAME}"
-            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            TAGS="${{ env.REGISTRY }}/${REPO_LOWER}:${TAG_NAME}"
+            TAGS="${TAGS},${{ env.REGISTRY }}/${REPO_LOWER}:latest"
             echo "docker_tags=${TAGS}" >> $GITHUB_OUTPUT
             echo "use_metadata_action=false" >> $GITHUB_OUTPUT
           else
@@ -56,7 +60,7 @@ jobs:
         if: steps.prepare.outputs.use_metadata_action == 'true'
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.prepare.outputs.docker_repo }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -79,34 +83,35 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.IMAGE_NAME }}
+          repository: ${{ steps.prepare.outputs.docker_repo }}
           short-description: ${{ github.event.repository.description }}
           readme-filepath: ./README.md
 
       - name: Generate release notes
         id: release_notes
         run: |
-          cat > release_notes.md << 'EOF'
+          REPO_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          cat > release_notes.md << EOF
           ## Docker Images
 
           ### Pull the image
-          ```bash
-          docker pull ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          docker pull ${{ env.IMAGE_NAME }}:latest
-          ```
+          \`\`\`bash
+          docker pull ${REPO_LOWER}:${{ github.ref_name }}
+          docker pull ${REPO_LOWER}:latest
+          \`\`\`
 
           ### Multi-architecture support
-          - `linux/amd64`
-          - `linux/arm64`
+          - \`linux/amd64\`
+          - \`linux/arm64\`
 
           ### Quick start
-          ```bash
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            -e PRUNE_ALL=true \
-            -e PRUNE_VOLUMES=true \
-            -e CLEANUP_VOLUMES=true \
-            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          ```
+          \`\`\`bash
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\
+            -e PRUNE_ALL=true \\
+            -e PRUNE_VOLUMES=true \\
+            -e CLEANUP_VOLUMES=true \\
+            ${REPO_LOWER}:${{ github.ref_name }}
+          \`\`\`
 
           ## What's Changed
 
