@@ -102,13 +102,17 @@ run_local_tests() {
 
     local exit_code=0
 
+    # Note: Test 11 (local cleanup) cannot use remote contexts
+    # It always runs on the local Docker daemon
+    if [ -n "$TEST_CONTEXT" ]; then
+        echo -e "${YELLOW}Note: Local script tests run on local Docker daemon only${NC}"
+        echo -e "${YELLOW}Context-specific tests will use test 12 (container) and test 13 (remote)${NC}"
+        echo ""
+    fi
+
     # Test 1: Default settings
     echo -e "${YELLOW}Test 1: Default cleanup settings${NC}"
-    if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/11-test-local-cleanup.sh --context "$TEST_CONTEXT" || exit_code=$?
-    else
-        ./tests/11-test-local-cleanup.sh || exit_code=$?
-    fi
+    ./tests/11-test-local-cleanup.sh || exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
         LOCAL_RESULT="FAILED"
@@ -120,11 +124,7 @@ run_local_tests() {
 
     # Test 2: Aggressive settings
     echo -e "${YELLOW}Test 2: Aggressive cleanup settings${NC}"
-    if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/11-test-local-cleanup.sh --prune-all --prune-volumes --context "$TEST_CONTEXT" || exit_code=$?
-    else
-        ./tests/11-test-local-cleanup.sh --prune-all --prune-volumes || exit_code=$?
-    fi
+    ./tests/11-test-local-cleanup.sh --prune-all --prune-volumes || exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
         LOCAL_RESULT="FAILED"
@@ -136,11 +136,7 @@ run_local_tests() {
 
     # Test 3: Dry-run mode
     echo -e "${YELLOW}Test 3: Dry-run mode${NC}"
-    if [ -n "$TEST_CONTEXT" ]; then
-        ./tests/11-test-local-cleanup.sh --dry-run --context "$TEST_CONTEXT" || exit_code=$?
-    else
-        ./tests/11-test-local-cleanup.sh --dry-run || exit_code=$?
-    fi
+    ./tests/11-test-local-cleanup.sh --dry-run || exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
         LOCAL_RESULT="FAILED"

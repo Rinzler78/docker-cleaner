@@ -53,14 +53,19 @@ docker_ctx() {
 
 # Validate context if specified
 if [ -n "$TARGET_CONTEXT" ]; then
-    if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
-        echo -e "${RED}Error: Context '$TARGET_CONTEXT' does not exist${NC}"
-        echo "Available contexts:"
-        docker context ls
-        exit 1
-    fi
-    echo "Using Docker context: $TARGET_CONTEXT"
+    # Warning: Local cleanup script cannot use Docker contexts
+    echo -e "${YELLOW}=========================================${NC}"
+    echo -e "${YELLOW}WARNING: Local cleanup script limitation${NC}"
+    echo -e "${YELLOW}=========================================${NC}"
+    echo -e "${YELLOW}The local cleanup script (cleanup.sh) executes directly${NC}"
+    echo -e "${YELLOW}on the local machine and cannot use Docker contexts.${NC}"
     echo ""
+    echo -e "${YELLOW}This test will SKIP context testing.${NC}"
+    echo -e "${YELLOW}Use test 12 (container) or test 13 (remote) for context testing.${NC}"
+    echo -e "${YELLOW}=========================================${NC}"
+    echo ""
+    echo -e "${BLUE}Skipping test - use test 12 or 13 for context testing${NC}"
+    exit 0
 fi
 
 # Cleanup on exit

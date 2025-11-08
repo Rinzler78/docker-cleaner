@@ -59,14 +59,54 @@ cleanup_on_exit() {
 # Set trap for cleanup
 trap cleanup_on_exit EXIT INT TERM
 
-# Test results tracking
-declare -A CONTEXT_RESULTS
+# Test results tracking (Bash 3.2 compatible - no associative arrays)
+# Use parallel arrays for context results
+TESTED_CONTEXTS=()
+CONTEXT_RESULTS=()
 FAILED_CONTEXTS=()
 
 # Test counters
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
+
+# Helper functions for managing context results (Bash 3.2 compatible)
+set_context_result() {
+    local ctx="$1"
+    local result="$2"
+
+    # Check if context already exists
+    local idx=-1
+    for i in "${!TESTED_CONTEXTS[@]}"; do
+        if [ "${TESTED_CONTEXTS[$i]}" = "$ctx" ]; then
+            idx=$i
+            break
+        fi
+    done
+
+    if [ $idx -ge 0 ]; then
+        # Update existing
+        CONTEXT_RESULTS[$idx]="$result"
+    else
+        # Add new
+        TESTED_CONTEXTS+=("$ctx")
+        CONTEXT_RESULTS+=("$result")
+    fi
+}
+
+get_context_result() {
+    local ctx="$1"
+
+    for i in "${!TESTED_CONTEXTS[@]}"; do
+        if [ "${TESTED_CONTEXTS[$i]}" = "$ctx" ]; then
+            echo "${CONTEXT_RESULTS[$i]}"
+            return 0
+        fi
+    done
+
+    echo ""
+    return 1
+}
 
 # Docker context wrapper for a specific context (used within test_context)
 docker_ctx() {
@@ -134,7 +174,7 @@ test_context() {
     echo "Switching to context: $context_name"
     if ! docker context use "$context_name" >/dev/null 2>&1; then
         echo -e "${RED}✗ Failed to switch to context: $context_name${NC}"
-        CONTEXT_RESULTS["$context_name"]="FAILED - Cannot switch context"
+        set_context_result "$context_name" "FAILED - Cannot switch context"
         FAILED_CONTEXTS+=("$context_name")
         return 1
     fi
@@ -146,7 +186,7 @@ test_context() {
     echo "Checking context connectivity..."
     if ! check_context_connectivity "$context_name"; then
         echo -e "${RED}✗ Context unreachable: $context_name${NC}"
-        CONTEXT_RESULTS["$context_name"]="FAILED - Context unreachable"
+        set_context_result "$context_name" "FAILED - Context unreachable"
         FAILED_CONTEXTS+=("$context_name")
         return 1
     fi
@@ -162,7 +202,7 @@ test_context() {
         echo "  docker context use $context_name"
         echo "  docker build -t $IMAGE_TAG ."
         echo ""
-        CONTEXT_RESULTS["$context_name"]="SKIPPED - Image not available"
+        set_context_result "$context_name" "SKIPPED - Image not available"
         return 0
     fi
 
@@ -175,7 +215,7 @@ test_context() {
 
     if ! ./tests/01-setup-test-resources.sh --context "$context_name" >/dev/null 2>&1; then
         echo -e "${RED}✗ Failed to create test resources on $context_name${NC}"
-        CONTEXT_RESULTS["$context_name"]="FAILED - Setup failed"
+        set_context_result "$context_name" "FAILED - Setup failed"
         FAILED_CONTEXTS+=("$context_name")
         return 1
     fi
@@ -302,11 +342,11 @@ test_context() {
 
     # Store results
     if [ "$context_passed" = true ]; then
-        CONTEXT_RESULTS["$context_name"]="PASSED"
+        set_context_result "$context_name" "PASSED"
         echo -e "${GREEN}✓ All tests passed for context: $context_name${NC}"
         return 0
     else
-        CONTEXT_RESULTS["$context_name"]="FAILED - Some tests failed"
+        set_context_result "$context_name" "FAILED - Some tests failed"
         FAILED_CONTEXTS+=("$context_name")
         echo -e "${RED}✗ Some tests failed for context: $context_name${NC}"
         return 1
@@ -365,7 +405,8 @@ main() {
         local test_result=$?
 
         if [ $test_result -eq 0 ]; then
-            if [ "${CONTEXT_RESULTS[$ctx]}" = "PASSED" ]; then
+            local ctx_result=$(get_context_result "$ctx")
+            if [ "$ctx_result" = "PASSED" ]; then
                 passed_count=$((passed_count + 1))
             else
                 skipped_count=$((skipped_count + 1))
@@ -397,7 +438,7 @@ main() {
 
     echo "Detailed results by context:"
     for ctx in $contexts_to_test; do
-        local result="${CONTEXT_RESULTS[$ctx]}"
+        local result=$(get_context_result "$ctx")
         if [ "$result" = "PASSED" ]; then
             echo -e "  ${GREEN}✓${NC} $ctx: $result"
         elif [[ "$result" == SKIPPED* ]]; then
