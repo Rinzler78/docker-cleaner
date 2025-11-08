@@ -400,6 +400,16 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
 
 ### Use Case 2: Remote NAS Cleanup
 
+**Option A: Using --context flag (Recommended)**
+```bash
+# Run cleanup on NAS without switching context
+docker --context nas run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  rinzlerfr/docker-cleaner:latest
+
+# Your active context remains unchanged
+```
+
+**Option B: Using context switching**
 ```bash
 # Switch to NAS context
 docker context use nas
@@ -451,15 +461,103 @@ jobs:
 docker context create dev-server --docker "host=ssh://dev-server"
 docker context create staging-server --docker "host=ssh://staging-server"
 
-# Cleanup script for all hosts
+# Cleanup script for all hosts (using --context flag, recommended)
 for ctx in default dev-server staging-server; do
   echo "Cleaning $ctx..."
-  docker context use $ctx
-  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  docker --context $ctx run --rm -v /var/run/docker.sock:/var/run/docker.sock \
     rinzlerfr/docker-cleaner:latest
 done
-docker context use default
+# No need to restore context - it was never changed!
 ```
+
+## Remote Docker Host Setup
+
+To use docker-cleaner on remote Docker hosts via contexts, you need to configure remote access to the Docker daemon.
+
+### Prerequisites
+
+**IMPORTANT**: Remote Docker hosts must expose the Docker API on port 2375 (TCP) or 2376 (TLS).
+
+### Option 1: Socat Container (Recommended)
+
+The easiest and safest way to expose Docker remotely without modifying daemon configuration:
+
+```bash
+# On the remote Docker host, run:
+docker run -d \
+  --name docker-socat \
+  --restart unless-stopped \
+  --network host \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  alpine/socat \
+  tcp-listen:2375,fork,reuseaddr unix-connect:/var/run/docker.sock
+```
+
+**Security Notes**:
+- This exposes Docker **without authentication** on port 2375
+- Only use on **trusted networks** (internal LAN, VPN)
+- For production environments, use SSH-based contexts or TLS authentication
+- Consider restricting access with firewall rules
+
+**Verify it's working**:
+```bash
+# On remote host
+docker ps | grep docker-socat
+
+# From local machine
+curl http://remote-host:2375/version
+```
+
+### Option 2: SSH-Based Context (Most Secure)
+
+For production environments, use SSH-based contexts instead:
+
+```bash
+# No special configuration needed on remote host
+# Just ensure SSH access is available
+
+# Create SSH-based context
+docker context create remote-nas \
+  --docker "host=ssh://user@remote-host"
+
+# Test it
+docker --context remote-nas ps
+```
+
+**Advantages**:
+- Uses existing SSH authentication
+- Encrypted communication
+- No additional ports to open
+- Works with existing SSH keys
+
+### Creating the Context
+
+Once the remote host is configured (socat or SSH), create a Docker context:
+
+```bash
+# For TCP access (with socat)
+docker context create nas \
+  --docker "host=tcp://nas.local:2375"
+
+# For SSH access (recommended)
+docker context create nas \
+  --docker "host=ssh://user@nas.local"
+
+# Verify the context
+docker context ls
+docker --context nas ps
+```
+
+### Using with docker-cleaner
+
+```bash
+# Run cleanup on remote host via context
+docker --context nas run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  rinzlerfr/docker-cleaner:latest
+```
+
+For more details on context setup and security considerations, see [docs/testing-guide.md](docs/testing-guide.md#remote-docker-host-configuration).
 
 ### Example Output
 

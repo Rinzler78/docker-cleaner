@@ -123,7 +123,7 @@ Removes all test resources created by `01-setup-test-resources.sh`.
 **Safety:**
 - Only removes resources with `test-cleanup=true` label
 - Production resources are never affected
-- Automatically restores original Docker context
+- Uses `--context` flag to avoid changing active Docker context
 
 **Examples:**
 ```bash
@@ -338,6 +338,26 @@ Options:
 
 ## Docker Context Setup
 
+### Important: Context Switching Behavior
+
+**All test scripts now use the `--context` flag** instead of `docker context use`. This means:
+- ✅ **Your active context is never changed** during test execution
+- ✅ **No need to restore context** after running tests
+- ✅ **Safe to run multiple tests in parallel** on different contexts
+- ✅ **Explicit control** over which context is targeted
+
+Example:
+```bash
+# Your active context remains unchanged
+docker context show  # Output: default
+
+# Run tests on remote context
+./tests/11-test-local-cleanup.sh --context remote-nas
+
+# Active context is still default (not changed)
+docker context show  # Output: default
+```
+
 ### SSH-Based Context
 
 Create a Docker context for remote host access via SSH:
@@ -347,12 +367,10 @@ Create a Docker context for remote host access via SSH:
 docker context create remote-nas \
   --docker "host=ssh://user@nas.example.com"
 
-# Test connectivity
-docker context use remote-nas
-docker ps
+# Test connectivity using --context flag
+docker --context remote-nas ps
 
-# Return to default context
-docker context use default
+# No need to switch back - active context never changed
 ```
 
 ### TCP-Based Context
@@ -370,6 +388,79 @@ docker context create remote-tls \
   --docker "ca=/path/to/ca.pem" \
   --docker "cert=/path/to/cert.pem" \
   --docker "key=/path/to/key.pem"
+```
+
+### Remote Docker Host Configuration
+
+#### Prerequisites for TCP-Based Contexts
+
+**IMPORTANT**: To use TCP-based Docker contexts, port 2375 (or 2376 for TLS) must be open on the remote Docker host.
+
+#### Option 1: Expose Docker Socket via Socat Container (Recommended)
+
+For systems where you cannot or don't want to modify the Docker daemon configuration, use a socat container to expose the Docker socket over TCP:
+
+```bash
+# On the remote Docker host, run:
+docker run -d \
+  --name docker-socat \
+  --restart unless-stopped \
+  --network host \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  alpine/socat \
+  tcp-listen:2375,fork,reuseaddr unix-connect:/var/run/docker.sock
+```
+
+**Security Notes**:
+- This exposes Docker without authentication on port 2375
+- Only use on trusted networks or with firewall rules
+- For production, use SSH-based contexts or TLS authentication
+- Consider restricting access with iptables rules:
+  ```bash
+  # Example: Allow only from specific IP
+  sudo iptables -A INPUT -p tcp --dport 2375 -s 192.168.1.100 -j ACCEPT
+  sudo iptables -A INPUT -p tcp --dport 2375 -j DROP
+  ```
+
+**Verify the socat container is running**:
+```bash
+# On remote host
+docker ps | grep docker-socat
+
+# From local machine
+docker --context remote-tcp ps
+```
+
+#### Option 2: Configure Docker Daemon (Alternative)
+
+Alternatively, you can configure the Docker daemon to listen on TCP:
+
+**Edit `/etc/docker/daemon.json`**:
+```json
+{
+  "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
+}
+```
+
+**Restart Docker**:
+```bash
+sudo systemctl restart docker
+```
+
+**Warning**: This method requires daemon restart and affects all Docker operations on the host.
+
+#### Testing Remote Connection
+
+After setting up TCP access, test the connection:
+
+```bash
+# Create context
+docker context create my-remote \
+  --docker "host=tcp://remote-host:2375"
+
+# Test connection
+docker --context my-remote version
+docker --context my-remote ps
 ```
 
 ### List Contexts
@@ -403,11 +494,13 @@ sudo usermod -aG docker $USER
 ### Issue: Remote context tests skip with "Image not found"
 
 **Solution:**
-Build or push the image to the remote host:
+Build or push the image to the remote host using `--context` flag:
 ```bash
-docker context use remote-nas
-docker build -t docker-cleaner:test .
-docker context use default
+# Build image on remote host (no context switching needed)
+docker --context remote-nas build -t docker-cleaner:test .
+
+# Or using buildx for multi-context builds
+docker buildx build --context remote-nas -t docker-cleaner:test .
 ```
 
 ### Issue: Test resources not cleaned up after failure
@@ -421,15 +514,19 @@ Manually cleanup test resources:
 ./tests/03-cleanup-test-resources.sh --context remote-nas
 ```
 
-### Issue: Context switch fails during tests
+### Issue: Tests fail with "Context does not exist"
 
 **Solution:**
 Verify context exists and is accessible:
 ```bash
+# List all available contexts
 docker context ls
-docker context use <context-name>
-docker ps  # Test connectivity
-docker context use default
+
+# Test connectivity using --context flag (no switching needed)
+docker --context <context-name> ps
+
+# If context doesn't exist, create it
+docker context create <context-name> --docker "host=ssh://user@host"
 ```
 
 ### Issue: Tests fail on macOS with "Cannot connect to Docker daemon"
@@ -565,6 +662,8 @@ Expected execution times (on typical hardware):
 5. **Use specific contexts** (`--context`) for targeted testing
 6. **Review test logs** in `/tmp/` for debugging failures
 7. **Keep test resources isolated** using labels to prevent production impact
+8. **No need to restore context** - all tests use `--context` flag without changing active context
+9. **Run tests in parallel** on different contexts safely since they don't interfere
 
 ## Support
 
@@ -578,7 +677,35 @@ For issues or questions about testing:
 When adding new tests:
 1. Follow existing test script patterns
 2. Use consistent error handling (`set -euo pipefail`)
-3. Add trap handlers for cleanup on failure
-4. Use colored output for readability
-5. Document test purpose and usage
-6. Update this guide with new test information
+3. **Use `docker_ctx()` helper function** instead of direct `docker` commands
+4. **Use `--context` flag pattern** instead of `docker context use`
+5. Add trap handlers for cleanup on failure
+6. Use colored output for readability
+7. Document test purpose and usage
+8. Update this guide with new test information
+
+### docker_ctx() Helper Pattern
+
+All test scripts use a helper function to handle contexts:
+
+```bash
+# Docker context wrapper - uses --context flag when TARGET_CONTEXT is set
+docker_ctx() {
+    if [ -n "$TARGET_CONTEXT" ]; then
+        docker --context "$TARGET_CONTEXT" "$@"
+    else
+        docker "$@"
+    fi
+}
+
+# Usage in tests
+docker_ctx ps -q
+docker_ctx run --rm myimage
+docker_ctx volume ls
+```
+
+This ensures:
+- Context is never switched globally
+- Tests are isolated and can run in parallel
+- No cleanup of context state is needed
+- More predictable and safer behavior

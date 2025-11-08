@@ -5,7 +5,6 @@ set -euo pipefail
 
 # Parse command line arguments
 TARGET_CONTEXT=""
-ORIGINAL_CONTEXT=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -21,53 +20,37 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Context management
-setup_context() {
+# Docker context wrapper - uses --context flag when TARGET_CONTEXT is set
+docker_ctx() {
     if [ -n "$TARGET_CONTEXT" ]; then
-        # Store original context
-        ORIGINAL_CONTEXT=$(docker context show)
-        echo "Switching from context '$ORIGINAL_CONTEXT' to '$TARGET_CONTEXT'..."
-
-        # Validate target context exists
-        if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
-            echo "Error: Context '$TARGET_CONTEXT' does not exist"
-            echo "Available contexts:"
-            docker context ls
-            exit 1
-        fi
-
-        # Switch to target context
-        docker context use "$TARGET_CONTEXT" >/dev/null 2>&1
-        echo "✓ Switched to context: $TARGET_CONTEXT"
-        echo ""
+        docker --context "$TARGET_CONTEXT" "$@"
+    else
+        docker "$@"
     fi
 }
 
-# Restore context on exit
-restore_context() {
-    if [ -n "$ORIGINAL_CONTEXT" ] && [ "$ORIGINAL_CONTEXT" != "$(docker context show)" ]; then
-        echo ""
-        echo "Restoring original context: $ORIGINAL_CONTEXT"
-        docker context use "$ORIGINAL_CONTEXT" >/dev/null 2>&1
+# Validate context if specified
+if [ -n "$TARGET_CONTEXT" ]; then
+    if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
+        echo "Error: Context '$TARGET_CONTEXT' does not exist"
+        echo "Available contexts:"
+        docker context ls
+        exit 1
     fi
-}
-
-# Set trap for context restoration
-trap restore_context EXIT
+    echo "Using Docker context: $TARGET_CONTEXT"
+    echo ""
+fi
 
 echo "=== Docker Cleanup Container - Test Resource Setup ==="
 echo ""
 
-# Setup context if specified
-setup_context
-
 # Cleanup function
 cleanup_existing() {
     echo "Cleaning up any existing test resources..."
-    docker rm -f $(docker ps -aq --filter label=test-cleanup=true) 2>/dev/null || true
-    docker rmi $(docker images -q --filter label=test-cleanup=true) 2>/dev/null || true
-    docker volume rm $(docker volume ls -q --filter label=test-cleanup=true) 2>/dev/null || true
-    docker network rm $(docker network ls -q --filter label=test-cleanup=true) 2>/dev/null || true
+    docker_ctx rm -f $(docker_ctx ps -aq --filter label=test-cleanup=true) 2>/dev/null || true
+    docker_ctx rmi $(docker_ctx images -q --filter label=test-cleanup=true) 2>/dev/null || true
+    docker_ctx volume rm $(docker_ctx volume ls -q --filter label=test-cleanup=true) 2>/dev/null || true
+    docker_ctx network rm $(docker_ctx network ls -q --filter label=test-cleanup=true) 2>/dev/null || true
     echo "✓ Existing test resources cleaned up"
     echo ""
 }
@@ -75,13 +58,13 @@ cleanup_existing() {
 # Create running containers
 create_running_containers() {
     echo "Creating running containers..."
-    docker run -d \
+    docker_ctx run -d \
         --name test-cleanup-container-running-1 \
         --label test-cleanup=true \
         --label keep=true \
         alpine:latest sleep 3600
 
-    docker run -d \
+    docker_ctx run -d \
         --name test-cleanup-container-running-2 \
         --label test-cleanup=true \
         alpine:latest sleep 3600
@@ -92,17 +75,17 @@ create_running_containers() {
 # Create stopped containers
 create_stopped_containers() {
     echo "Creating stopped containers..."
-    docker create \
+    docker_ctx create \
         --name test-cleanup-container-stopped-1 \
         --label test-cleanup=true \
         alpine:latest echo "test"
 
-    docker create \
+    docker_ctx create \
         --name test-cleanup-container-stopped-2 \
         --label test-cleanup=true \
         alpine:latest echo "test"
 
-    docker run \
+    docker_ctx run \
         --name test-cleanup-container-exited-1 \
         --label test-cleanup=true \
         alpine:latest echo "test"
@@ -113,10 +96,10 @@ create_stopped_containers() {
 # Create tagged images
 create_tagged_images() {
     echo "Creating tagged images..."
-    docker tag alpine:latest test-cleanup-image:v1
-    docker image inspect test-cleanup-image:v1 > /dev/null 2>&1 \
-        && docker image tag test-cleanup-image:v1 test-cleanup-image:labeled \
-        && docker image inspect test-cleanup-image:labeled > /dev/null 2>&1
+    docker_ctx tag alpine:latest test-cleanup-image:v1
+    docker_ctx image inspect test-cleanup-image:v1 > /dev/null 2>&1 \
+        && docker_ctx image tag test-cleanup-image:v1 test-cleanup-image:labeled \
+        && docker_ctx image inspect test-cleanup-image:labeled > /dev/null 2>&1
 
     echo "✓ Created tagged test images"
 }
@@ -132,7 +115,7 @@ RUN echo "test layer 1" > /tmp/test1
 LABEL test-cleanup=true
 EOF
 
-    docker build -t test-cleanup-temp:latest -f /tmp/test-cleanup-dockerfile-1 . >/dev/null 2>&1
+    docker_ctx build -t test-cleanup-temp:latest -f /tmp/test-cleanup-dockerfile-1 . >/dev/null 2>&1
 
     # Create another build with same tag to make previous one dangling
     cat > /tmp/test-cleanup-dockerfile-2 <<EOF
@@ -141,7 +124,7 @@ RUN echo "test layer 2" > /tmp/test2
 LABEL test-cleanup=true
 EOF
 
-    docker build -t test-cleanup-temp:latest -f /tmp/test-cleanup-dockerfile-2 . >/dev/null 2>&1
+    docker_ctx build -t test-cleanup-temp:latest -f /tmp/test-cleanup-dockerfile-2 . >/dev/null 2>&1
 
     rm -f /tmp/test-cleanup-dockerfile-*
 
@@ -151,17 +134,17 @@ EOF
 # Create volumes (used)
 create_used_volumes() {
     echo "Creating volumes in use..."
-    docker volume create --label test-cleanup=true test-cleanup-volume-used-1
-    docker volume create --label test-cleanup=true --label keep=true test-cleanup-volume-used-2
+    docker_ctx volume create --label test-cleanup=true test-cleanup-volume-used-1
+    docker_ctx volume create --label test-cleanup=true --label keep=true test-cleanup-volume-used-2
 
     # Attach volumes to running containers
-    docker run -d \
+    docker_ctx run -d \
         --name test-cleanup-vol-user-1 \
         --label test-cleanup=true \
         -v test-cleanup-volume-used-1:/data \
         alpine:latest sleep 3600
 
-    docker run -d \
+    docker_ctx run -d \
         --name test-cleanup-vol-user-2 \
         --label test-cleanup=true \
         -v test-cleanup-volume-used-2:/data \
@@ -173,9 +156,9 @@ create_used_volumes() {
 # Create volumes (unused)
 create_unused_volumes() {
     echo "Creating unused volumes..."
-    docker volume create --label test-cleanup=true test-cleanup-volume-unused-1
-    docker volume create --label test-cleanup=true test-cleanup-volume-unused-2
-    docker volume create --label test-cleanup=true test-cleanup-volume-unused-3
+    docker_ctx volume create --label test-cleanup=true test-cleanup-volume-unused-1
+    docker_ctx volume create --label test-cleanup=true test-cleanup-volume-unused-2
+    docker_ctx volume create --label test-cleanup=true test-cleanup-volume-unused-3
 
     echo "✓ Created 3 unused volumes"
 }
@@ -183,17 +166,17 @@ create_unused_volumes() {
 # Create networks (used)
 create_used_networks() {
     echo "Creating networks in use..."
-    docker network create --label test-cleanup=true test-cleanup-network-used-1
-    docker network create --label test-cleanup=true --label keep=true test-cleanup-network-used-2
+    docker_ctx network create --label test-cleanup=true test-cleanup-network-used-1
+    docker_ctx network create --label test-cleanup=true --label keep=true test-cleanup-network-used-2
 
     # Attach networks to running containers
-    docker run -d \
+    docker_ctx run -d \
         --name test-cleanup-net-user-1 \
         --label test-cleanup=true \
         --network test-cleanup-network-used-1 \
         alpine:latest sleep 3600
 
-    docker run -d \
+    docker_ctx run -d \
         --name test-cleanup-net-user-2 \
         --label test-cleanup=true \
         --network test-cleanup-network-used-2 \
@@ -205,8 +188,8 @@ create_used_networks() {
 # Create networks (unused)
 create_unused_networks() {
     echo "Creating unused networks..."
-    docker network create --label test-cleanup=true test-cleanup-network-unused-1
-    docker network create --label test-cleanup=true test-cleanup-network-unused-2
+    docker_ctx network create --label test-cleanup=true test-cleanup-network-unused-1
+    docker_ctx network create --label test-cleanup=true test-cleanup-network-unused-2
 
     echo "✓ Created 2 unused networks"
 }
@@ -222,8 +205,8 @@ RUN echo "cache layer 1" > /tmp/cache1
 RUN echo "cache layer 2" > /tmp/cache2
 EOF
 
-    docker build -t test-cleanup-cache:latest -f /tmp/test-cleanup-cache-dockerfile . >/dev/null 2>&1
-    docker rmi test-cleanup-cache:latest 2>/dev/null || true
+    docker_ctx build -t test-cleanup-cache:latest -f /tmp/test-cleanup-cache-dockerfile . >/dev/null 2>&1
+    docker_ctx rmi test-cleanup-cache:latest 2>/dev/null || true
 
     rm -f /tmp/test-cleanup-cache-dockerfile
 
@@ -235,16 +218,16 @@ print_summary() {
     echo ""
     echo "=== Test Resources Summary ==="
 
-    local current_context=$(docker context show)
+    local current_context=$(docker_ctx context show)
     echo "Docker Context: $current_context"
     echo ""
 
-    local running_count=$(docker ps -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
-    local stopped_count=$(docker ps -aq -f status=exited -f status=created --filter label=test-cleanup=true | wc -l | tr -d ' ')
-    local image_count=$(docker images -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
-    local dangling_count=$(docker images -f dangling=true -q | wc -l | tr -d ' ')
-    local volume_count=$(docker volume ls -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
-    local network_count=$(docker network ls -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
+    local running_count=$(docker_ctx ps -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
+    local stopped_count=$(docker_ctx ps -aq -f status=exited -f status=created --filter label=test-cleanup=true | wc -l | tr -d ' ')
+    local image_count=$(docker_ctx images -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
+    local dangling_count=$(docker_ctx images -f dangling=true -q | wc -l | tr -d ' ')
+    local volume_count=$(docker_ctx volume ls -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
+    local network_count=$(docker_ctx network ls -q --filter label=test-cleanup=true | wc -l | tr -d ' ')
 
     echo "Containers (running): $running_count"
     echo "Containers (stopped): $stopped_count"

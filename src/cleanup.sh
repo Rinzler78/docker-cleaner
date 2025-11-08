@@ -88,6 +88,7 @@ prune_containers() {
     if [ "$DRY_RUN" = "true" ]; then
         info "[DRY RUN] Would execute: $cmd"
         info "[DRY RUN] Would remove approximately $stopped_count stopped containers"
+        OPERATIONS_SUCCEEDED=$((OPERATIONS_SUCCEEDED + 1))
         return 0
     fi
 
@@ -136,6 +137,7 @@ prune_images() {
         else
             info "[DRY RUN] Would remove approximately $dangling_count dangling images"
         fi
+        OPERATIONS_SUCCEEDED=$((OPERATIONS_SUCCEEDED + 1))
         return 0
     fi
 
@@ -201,6 +203,7 @@ prune_volumes() {
         info "[DRY RUN] Would execute: $cmd"
         info "[DRY RUN] Would potentially remove $unused_volumes unused volumes"
         warn "[DRY RUN] This would PERMANENTLY DELETE data in these volumes"
+        OPERATIONS_SUCCEEDED=$((OPERATIONS_SUCCEEDED + 1))
         return 0
     fi
 
@@ -236,6 +239,7 @@ prune_networks() {
     if [ "$DRY_RUN" = "true" ]; then
         info "[DRY RUN] Would execute: $cmd"
         info "[DRY RUN] Would potentially remove unused custom networks"
+        OPERATIONS_SUCCEEDED=$((OPERATIONS_SUCCEEDED + 1))
         return 0
     fi
 
@@ -264,6 +268,7 @@ prune_build_cache() {
     if [ "$DRY_RUN" = "true" ]; then
         info "[DRY RUN] Would execute: $cmd"
         info "[DRY RUN] Would remove Docker build cache"
+        OPERATIONS_SUCCEEDED=$((OPERATIONS_SUCCEEDED + 1))
         return 0
     fi
 

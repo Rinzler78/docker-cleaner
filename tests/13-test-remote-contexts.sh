@@ -68,21 +68,32 @@ TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
 
-# Resource counting functions
+# Docker context wrapper for a specific context (used within test_context)
+docker_ctx() {
+    local ctx="$1"
+    shift
+    docker --context "$ctx" "$@"
+}
+
+# Resource counting functions (use context-specific commands)
 count_running_containers() {
-    docker ps -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    local ctx="$1"
+    docker_ctx "$ctx" ps -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_stopped_containers() {
-    docker ps -aq -f status=exited -f status=created --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    local ctx="$1"
+    docker_ctx "$ctx" ps -aq -f status=exited -f status=created --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_volumes() {
-    docker volume ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    local ctx="$1"
+    docker_ctx "$ctx" volume ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_networks() {
-    docker network ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    local ctx="$1"
+    docker_ctx "$ctx" network ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 # Check if context is reachable
@@ -90,7 +101,7 @@ check_context_connectivity() {
     local context_name="$1"
 
     # Try to list containers
-    if docker ps >/dev/null 2>&1; then
+    if docker_ctx "$context_name" ps >/dev/null 2>&1; then
         return 0
     else
         return 1
@@ -102,7 +113,7 @@ check_image_exists() {
     local context_name="$1"
     local image="$2"
 
-    if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
+    if docker_ctx "$context_name" images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
         return 0
     else
         return 1
@@ -173,10 +184,10 @@ test_context() {
     echo ""
 
     # Count before
-    local BEFORE_RUNNING=$(count_running_containers)
-    local BEFORE_STOPPED=$(count_stopped_containers)
-    local BEFORE_VOLUMES=$(count_volumes)
-    local BEFORE_NETWORKS=$(count_networks)
+    local BEFORE_RUNNING=$(count_running_containers "$context_name")
+    local BEFORE_STOPPED=$(count_stopped_containers "$context_name")
+    local BEFORE_VOLUMES=$(count_volumes "$context_name")
+    local BEFORE_NETWORKS=$(count_networks "$context_name")
 
     echo "Resources before cleanup:"
     echo "  Running containers: $BEFORE_RUNNING"
@@ -190,7 +201,7 @@ test_context() {
     echo "Running docker-cleaner on $context_name..."
 
     local container_exit_code=0
-    docker run --rm \
+    docker_ctx "$context_name" run --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         "$IMAGE_TAG" 2>&1 | tee "/tmp/remote-cleanup-$context_name.log" || container_exit_code=$?
 
@@ -201,10 +212,10 @@ test_context() {
     # Phase 3: Validation
     echo -e "${BLUE}=== Phase 3: Validation ===${NC}"
 
-    local AFTER_RUNNING=$(count_running_containers)
-    local AFTER_STOPPED=$(count_stopped_containers)
-    local AFTER_VOLUMES=$(count_volumes)
-    local AFTER_NETWORKS=$(count_networks)
+    local AFTER_RUNNING=$(count_running_containers "$context_name")
+    local AFTER_STOPPED=$(count_stopped_containers "$context_name")
+    local AFTER_VOLUMES=$(count_volumes "$context_name")
+    local AFTER_NETWORKS=$(count_networks "$context_name")
 
     echo "Resources after cleanup:"
     echo "  Running containers: $AFTER_RUNNING"

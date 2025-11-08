@@ -15,7 +15,6 @@ DRY_RUN_MODE=false
 PRUNE_ALL_MODE=false
 PRUNE_VOLUMES_MODE=false
 TARGET_CONTEXT=""
-ORIGINAL_CONTEXT=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -43,38 +42,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Context management
-setup_context() {
+# Docker context wrapper - uses --context flag when TARGET_CONTEXT is set
+docker_ctx() {
     if [ -n "$TARGET_CONTEXT" ]; then
-        # Store original context
-        ORIGINAL_CONTEXT=$(docker context show)
-
-        # Validate target context exists
-        if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
-            echo -e "${RED}Error: Context '$TARGET_CONTEXT' does not exist${NC}"
-            echo "Available contexts:"
-            docker context ls
-            exit 1
-        fi
-
-        # Switch to target context
-        docker context use "$TARGET_CONTEXT" >/dev/null 2>&1
-        echo -e "${GREEN}✓ Switched to context: $TARGET_CONTEXT${NC}"
+        docker --context "$TARGET_CONTEXT" "$@"
+    else
+        docker "$@"
     fi
 }
 
-# Restore context and cleanup on exit
+# Validate context if specified
+if [ -n "$TARGET_CONTEXT" ]; then
+    if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
+        echo -e "${RED}Error: Context '$TARGET_CONTEXT' does not exist${NC}"
+        echo "Available contexts:"
+        docker context ls
+        exit 1
+    fi
+    echo "Using Docker context: $TARGET_CONTEXT"
+    echo ""
+fi
+
+# Cleanup on exit
 cleanup_on_exit() {
     local exit_code=$?
 
     echo ""
     echo -e "${BLUE}=== Cleanup Phase ===${NC}"
-
-    # Restore context
-    if [ -n "$ORIGINAL_CONTEXT" ] && [ "$ORIGINAL_CONTEXT" != "$(docker context show)" ]; then
-        echo "Restoring original context: $ORIGINAL_CONTEXT"
-        docker context use "$ORIGINAL_CONTEXT" >/dev/null 2>&1
-    fi
 
     # Clean test resources
     echo "Removing test resources..."
@@ -160,24 +154,24 @@ assert_less_than() {
 
 # Resource counting functions
 count_running_containers() {
-    docker ps -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx ps -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_stopped_containers() {
-    docker ps -aq -f status=exited -f status=created --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx ps -aq -f status=exited -f status=created --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_volumes() {
-    docker volume ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx volume ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_unused_volumes() {
     # Count volumes that are not in use by any container
-    local all_volumes=$(docker volume ls -q --filter label=test-cleanup=true 2>/dev/null || true)
+    local all_volumes=$(docker_ctx volume ls -q --filter label=test-cleanup=true 2>/dev/null || true)
     local unused=0
 
     for vol in $all_volumes; do
-        local in_use=$(docker ps -a --filter volume="$vol" --format "{{.ID}}" 2>/dev/null | wc -l | tr -d ' ')
+        local in_use=$(docker_ctx ps -a --filter volume="$vol" --format "{{.ID}}" 2>/dev/null | wc -l | tr -d ' ')
         if [ "$in_use" -eq 0 ]; then
             unused=$((unused + 1))
         fi
@@ -187,15 +181,15 @@ count_unused_volumes() {
 }
 
 count_networks() {
-    docker network ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx network ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_unused_images() {
-    docker images --filter label=test-cleanup=true --filter dangling=false -q 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx images --filter label=test-cleanup=true --filter dangling=false -q 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_dangling_images() {
-    docker images -f dangling=true -q 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx images -f dangling=true -q 2>/dev/null | wc -l | tr -d ' '
 }
 
 # Main test execution
@@ -205,10 +199,7 @@ main() {
     echo -e "${BLUE}=====================================================${NC}"
     echo ""
 
-    # Setup context
-    setup_context
-
-    local current_context=$(docker context show)
+    local current_context=$(docker_ctx context show)
     echo "Testing on context: $current_context"
     echo ""
 
@@ -307,8 +298,8 @@ main() {
         assert_equals "Dry-run: Stopped containers unchanged" "$BEFORE_STOPPED" "$AFTER_STOPPED"
         assert_equals "Dry-run: Volumes unchanged" "$BEFORE_VOLUMES" "$AFTER_VOLUMES"
         assert_equals "Dry-run: Networks unchanged" "$BEFORE_NETWORKS" "$AFTER_NETWORKS"
-        # Dry-run returns exit code 2 (error) because no operations were actually performed
-        assert_equals "Dry-run: Exit code is 2" "2" "$cleanup_exit_code"
+        # Dry-run returns exit code 0 (success) even though no operations were actually performed
+        assert_equals "Dry-run: Exit code is 0" "0" "$cleanup_exit_code"
 
     elif [ "$PRUNE_ALL_MODE" = true ] && [ "$PRUNE_VOLUMES_MODE" = true ]; then
         # Aggressive mode: remove all unused resources

@@ -13,7 +13,6 @@ NC='\033[0m' # No Color
 # Parse command line arguments
 TEST_MODE="all"  # all, default, aggressive, errors
 TARGET_CONTEXT=""
-ORIGINAL_CONTEXT=""
 IMAGE_TAG="docker-cleaner:test"
 
 while [[ $# -gt 0 ]]; do
@@ -38,38 +37,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Context management
-setup_context() {
+# Docker context wrapper - uses --context flag when TARGET_CONTEXT is set
+docker_ctx() {
     if [ -n "$TARGET_CONTEXT" ]; then
-        # Store original context
-        ORIGINAL_CONTEXT=$(docker context show)
-
-        # Validate target context exists
-        if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
-            echo -e "${RED}Error: Context '$TARGET_CONTEXT' does not exist${NC}"
-            echo "Available contexts:"
-            docker context ls
-            exit 1
-        fi
-
-        # Switch to target context
-        docker context use "$TARGET_CONTEXT" >/dev/null 2>&1
-        echo -e "${GREEN}✓ Switched to context: $TARGET_CONTEXT${NC}"
+        docker --context "$TARGET_CONTEXT" "$@"
+    else
+        docker "$@"
     fi
 }
 
-# Restore context and cleanup on exit
+# Validate context if specified
+if [ -n "$TARGET_CONTEXT" ]; then
+    if ! docker context ls --format "{{.Name}}" | grep -q "^${TARGET_CONTEXT}$"; then
+        echo -e "${RED}Error: Context '$TARGET_CONTEXT' does not exist${NC}"
+        echo "Available contexts:"
+        docker context ls
+        exit 1
+    fi
+    echo "Using Docker context: $TARGET_CONTEXT"
+    echo ""
+fi
+
+# Cleanup on exit
 cleanup_on_exit() {
     local exit_code=$?
 
     echo ""
     echo -e "${BLUE}=== Cleanup Phase ===${NC}"
-
-    # Restore context
-    if [ -n "$ORIGINAL_CONTEXT" ] && [ "$ORIGINAL_CONTEXT" != "$(docker context show)" ]; then
-        echo "Restoring original context: $ORIGINAL_CONTEXT"
-        docker context use "$ORIGINAL_CONTEXT" >/dev/null 2>&1
-    fi
 
     # Clean test resources
     echo "Removing test resources..."
@@ -81,7 +75,7 @@ cleanup_on_exit() {
 
     # Remove test image
     echo "Removing test image..."
-    docker rmi "$IMAGE_TAG" >/dev/null 2>&1 || true
+    docker_ctx rmi "$IMAGE_TAG" >/dev/null 2>&1 || true
 
     echo -e "${GREEN}✓ Cleanup complete${NC}"
 
@@ -160,23 +154,23 @@ assert_less_than() {
 
 # Resource counting functions
 count_running_containers() {
-    docker ps -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx ps -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_stopped_containers() {
-    docker ps -aq -f status=exited -f status=created --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx ps -aq -f status=exited -f status=created --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_volumes() {
-    docker volume ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx volume ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_unused_volumes() {
-    local all_volumes=$(docker volume ls -q --filter label=test-cleanup=true 2>/dev/null || true)
+    local all_volumes=$(docker_ctx volume ls -q --filter label=test-cleanup=true 2>/dev/null || true)
     local unused=0
 
     for vol in $all_volumes; do
-        local in_use=$(docker ps -a --filter volume="$vol" --format "{{.ID}}" 2>/dev/null | wc -l | tr -d ' ')
+        local in_use=$(docker_ctx ps -a --filter volume="$vol" --format "{{.ID}}" 2>/dev/null | wc -l | tr -d ' ')
         if [ "$in_use" -eq 0 ]; then
             unused=$((unused + 1))
         fi
@@ -186,11 +180,11 @@ count_unused_volumes() {
 }
 
 count_networks() {
-    docker network ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx network ls -q --filter label=test-cleanup=true 2>/dev/null | wc -l | tr -d ' '
 }
 
 count_dangling_images() {
-    docker images -f dangling=true -q 2>/dev/null | wc -l | tr -d ' '
+    docker_ctx images -f dangling=true -q 2>/dev/null | wc -l | tr -d ' '
 }
 
 # Build test image
@@ -199,18 +193,18 @@ build_test_image() {
     echo "Building $IMAGE_TAG..."
 
     # Build image
-    docker build -t "$IMAGE_TAG" . >/dev/null 2>&1
+    docker_ctx build -t "$IMAGE_TAG" . >/dev/null 2>&1
 
     echo -e "${GREEN}✓ Image built successfully${NC}"
 
     # Validate image size
-    local image_size=$(docker images "$IMAGE_TAG" --format "{{.Size}}" | head -1)
+    local image_size=$(docker_ctx images "$IMAGE_TAG" --format "{{.Size}}" | head -1)
     echo "Image size: $image_size"
 
     # Validate image contents
     echo "Validating image contents..."
     # Test that image can be run (it will fail without socket but that's expected)
-    docker run --rm "$IMAGE_TAG" 2>&1 | grep -q "Docker socket not found" || true
+    docker_ctx run --rm "$IMAGE_TAG" 2>&1 | grep -q "Docker socket not found" || true
     echo -e "${GREEN}✓ Image validation passed${NC}"
     echo ""
 }
@@ -236,7 +230,7 @@ test_default_settings() {
     # Execute
     echo "Running container with default settings..."
     local container_exit_code=0
-    docker run --rm \
+    docker_ctx run --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         "$IMAGE_TAG" 2>&1 | tee /tmp/container-output.log || container_exit_code=$?
 
@@ -290,7 +284,7 @@ test_aggressive_settings() {
     # Execute
     echo "Running container with aggressive settings..."
     local container_exit_code=0
-    docker run --rm \
+    docker_ctx run --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e PRUNE_ALL=true \
         -e PRUNE_VOLUMES=true \
@@ -333,7 +327,7 @@ test_error_handling() {
     # Test 1: Missing Docker socket
     echo "Test 1: Missing Docker socket..."
     set +e  # Temporarily disable exit on error
-    local output=$(docker run --rm "$IMAGE_TAG" 2>&1)
+    local output=$(docker_ctx run --rm "$IMAGE_TAG" 2>&1)
     echo "$output" | grep -q "Docker socket not found"
     local exit_code=$?
     set -e  # Re-enable exit on error
@@ -358,13 +352,11 @@ test_error_handling() {
 
     local BEFORE_STOPPED=$(count_stopped_containers)
 
-    # Run in dry-run mode (dry-run returns exit code 2, so disable set -e)
-    set +e
-    docker run --rm \
+    # Run in dry-run mode (dry-run returns exit code 0 on success)
+    docker_ctx run --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e DRY_RUN=true \
         "$IMAGE_TAG" >/dev/null 2>&1
-    set -e
 
     local AFTER_STOPPED=$(count_stopped_containers)
 
@@ -397,7 +389,7 @@ test_host_cleanup() {
 
     # Run container to cleanup host
     echo "Running container to cleanup host..."
-    docker run --rm \
+    docker_ctx run --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         "$IMAGE_TAG" >/dev/null 2>&1
 
@@ -418,10 +410,7 @@ main() {
     echo -e "${BLUE}=====================================================${NC}"
     echo ""
 
-    # Setup context
-    setup_context
-
-    local current_context=$(docker context show)
+    local current_context=$(docker_ctx context show)
     echo "Testing on context: $current_context"
     echo ""
 
