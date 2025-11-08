@@ -43,7 +43,15 @@
       "Bash(./tests/99-run-all-tests.sh:*)",
       "Bash(docker container prune:*)",
       "Bash(docker:*)",
-      "Bash(./tests/01-setup-test-resources.sh:*)"
+      "Bash(./tests/01-setup-test-resources.sh:*)",
+      "Bash(chmod:*)",
+      "Bash(DRY_RUN=true CLEANUP_CONTAINERS=true CLEANUP_IMAGES=true CLEANUP_VOLUMES=false CLEANUP_NETWORKS=true CLEANUP_BUILD_CACHE=true PRUNE_ALL=false PRUNE_VOLUMES=false PRUNE_FORCE=true ./src/cleanup.sh:*)",
+      "Bash(./src/cleanup.sh)",
+      "Bash(env -i bash -c './src/cleanup.sh')",
+      "Bash(source:*)",
+      "Bash(find_active_context \"ml350pG8\")",
+      "Bash(./tests/13-test-remote-contexts.sh:*)",
+      "Bash(find_all_active_contexts)"
     ],
     "deny": [],
     "ask": []

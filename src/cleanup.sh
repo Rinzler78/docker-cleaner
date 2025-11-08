@@ -1,14 +1,290 @@
 #!/bin/bash
-# cleanup.sh - Main cleanup orchestrator for docker-cleaner
+# cleanup.sh - Docker cleanup all-in-one script
+# Combines entrypoint, logger, config validator, and cleanup logic
 
 set -euo pipefail
 
-# Detect script directory for sourcing dependencies
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ============================================================================
+# DEFAULT ENVIRONMENT VARIABLES
+# ============================================================================
 
-# Source dependencies
-source "${SCRIPT_DIR}/logger.sh"
-source "${SCRIPT_DIR}/config_validator.sh"
+# Logging settings
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+LOG_FORMAT="${LOG_FORMAT:-text}"
+QUIET="${QUIET:-false}"
+
+# Cleanup operations
+CLEANUP_CONTAINERS="${CLEANUP_CONTAINERS:-true}"
+CLEANUP_IMAGES="${CLEANUP_IMAGES:-true}"
+CLEANUP_VOLUMES="${CLEANUP_VOLUMES:-false}"
+CLEANUP_NETWORKS="${CLEANUP_NETWORKS:-true}"
+CLEANUP_BUILD_CACHE="${CLEANUP_BUILD_CACHE:-true}"
+
+# Prune settings
+PRUNE_ALL="${PRUNE_ALL:-false}"
+PRUNE_VOLUMES="${PRUNE_VOLUMES:-false}"
+PRUNE_FORCE="${PRUNE_FORCE:-true}"
+
+# Filters
+PRUNE_FILTER_UNTIL="${PRUNE_FILTER_UNTIL:-}"
+PRUNE_FILTER_LABEL="${PRUNE_FILTER_LABEL:-}"
+
+# Execution mode
+DRY_RUN="${DRY_RUN:-false}"
+
+# ============================================================================
+# LOGGER FUNCTIONS
+# ============================================================================
+
+# Get log level priority (compatible bash 3.2+)
+get_log_level_priority() {
+    case "$1" in
+        DEBUG) echo 0 ;;
+        INFO)  echo 1 ;;
+        WARN)  echo 2 ;;
+        ERROR) echo 3 ;;
+        *)     echo 1 ;; # Default to INFO
+    esac
+}
+
+# Get current log level priority
+CURRENT_LEVEL_PRIORITY=$(get_log_level_priority "$LOG_LEVEL")
+
+# Function: Get ISO 8601 timestamp
+get_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+# Function: Log message with level filtering
+log() {
+    local level="$1"
+    shift
+    local message="$*"
+
+    # Skip if quiet mode
+    if [ "$QUIET" = "true" ]; then
+        return 0
+    fi
+
+    # Check if this level should be logged
+    local level_priority=$(get_log_level_priority "$level")
+    if [ "$level_priority" -lt "$CURRENT_LEVEL_PRIORITY" ]; then
+        return 0
+    fi
+
+    # Format output based on LOG_FORMAT
+    if [ "$LOG_FORMAT" = "json" ]; then
+        log_json "$level" "$message"
+    else
+        log_text "$level" "$message"
+    fi
+}
+
+# Function: Log in text format
+log_text() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(get_timestamp)
+
+    echo "[${timestamp}] [${level}] ${message}" >&2
+}
+
+# Function: Log in JSON format
+log_json() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(get_timestamp)
+
+    # Escape quotes in message
+    local escaped_message="${message//\"/\\\"}"
+
+    echo "{\"timestamp\":\"${timestamp}\",\"level\":\"${level}\",\"message\":\"${escaped_message}\"}" >&2
+}
+
+# Function: Log operation result
+log_operation() {
+    local operation="$1"
+    local status="$2"
+    local count="$3"
+    local space_freed="$4"
+
+    if [ "$LOG_FORMAT" = "json" ]; then
+        local timestamp=$(get_timestamp)
+        echo "{\"timestamp\":\"${timestamp}\",\"level\":\"INFO\",\"operation\":\"${operation}\",\"status\":\"${status}\",\"count\":${count},\"space_freed\":\"${space_freed}\"}" >&2
+    else
+        log "INFO" "${operation}: ${status} (count: ${count}, space freed: ${space_freed})"
+    fi
+}
+
+# Function: Log debug messages
+debug() {
+    log "DEBUG" "$@"
+}
+
+# Function: Log info messages
+info() {
+    log "INFO" "$@"
+}
+
+# Function: Log warning messages
+warn() {
+    log "WARN" "$@"
+}
+
+# Function: Log error messages
+error() {
+    log "ERROR" "$@"
+}
+
+# ============================================================================
+# CONFIG VALIDATOR FUNCTIONS
+# ============================================================================
+
+# Function: Validate boolean value
+validate_boolean() {
+    local var_name="$1"
+    local var_value="$2"
+
+    case "$var_value" in
+        true|false|TRUE|FALSE|True|False|1|0)
+            return 0
+            ;;
+        *)
+            error "Invalid boolean value for $var_name: '$var_value' (expected: true/false)"
+            return 1
+            ;;
+    esac
+}
+
+# Function: Validate log level
+validate_log_level() {
+    local level="$1"
+
+    case "$level" in
+        DEBUG|INFO|WARN|ERROR)
+            return 0
+            ;;
+        *)
+            error "Invalid LOG_LEVEL: '$level' (expected: DEBUG, INFO, WARN, ERROR)"
+            return 1
+            ;;
+    esac
+}
+
+# Function: Validate log format
+validate_log_format() {
+    local format="$1"
+
+    case "$format" in
+        text|json)
+            return 0
+            ;;
+        *)
+            error "Invalid LOG_FORMAT: '$format' (expected: text, json)"
+            return 1
+            ;;
+    esac
+}
+
+# Function: Validate time duration format
+validate_duration() {
+    local var_name="$1"
+    local duration="$2"
+
+    # Empty is valid (means no filter)
+    if [ -z "$duration" ]; then
+        return 0
+    fi
+
+    # Check if it matches Docker duration format (e.g., 24h, 168h, 7d)
+    if echo "$duration" | grep -qE '^[0-9]+(s|m|h)$'; then
+        return 0
+    fi
+
+    error "Invalid duration format for $var_name: '$duration' (expected: Ns, Nm, or Nh, e.g., 24h, 168h)"
+    return 1
+}
+
+# Function: Print configuration summary
+print_config_summary() {
+    info "=== Configuration Summary ==="
+    info "Cleanup Operations:"
+    info "  - Containers: $CLEANUP_CONTAINERS"
+    info "  - Images: $CLEANUP_IMAGES (all: $PRUNE_ALL)"
+    info "  - Volumes: $CLEANUP_VOLUMES"
+    info "  - Networks: $CLEANUP_NETWORKS"
+    info "  - Build Cache: $CLEANUP_BUILD_CACHE"
+    info ""
+    info "Filters:"
+    info "  - Until: ${PRUNE_FILTER_UNTIL:-none}"
+    info "  - Label: ${PRUNE_FILTER_LABEL:-none}"
+    info ""
+    info "Logging:"
+    info "  - Level: $LOG_LEVEL"
+    info "  - Format: $LOG_FORMAT"
+    info "  - Quiet: $QUIET"
+    info ""
+    info "Execution:"
+    info "  - Dry Run: $DRY_RUN"
+    info "  - Force: $PRUNE_FORCE"
+    info "=========================="
+}
+
+# Function: Main validation
+validate_config() {
+    local validation_failed=false
+
+    debug "Starting configuration validation"
+
+    # Validate boolean variables
+    validate_boolean "PRUNE_ALL" "$PRUNE_ALL" || validation_failed=true
+    validate_boolean "PRUNE_VOLUMES" "$PRUNE_VOLUMES" || validation_failed=true
+    validate_boolean "PRUNE_FORCE" "$PRUNE_FORCE" || validation_failed=true
+    validate_boolean "CLEANUP_CONTAINERS" "$CLEANUP_CONTAINERS" || validation_failed=true
+    validate_boolean "CLEANUP_IMAGES" "$CLEANUP_IMAGES" || validation_failed=true
+    validate_boolean "CLEANUP_VOLUMES" "$CLEANUP_VOLUMES" || validation_failed=true
+    validate_boolean "CLEANUP_NETWORKS" "$CLEANUP_NETWORKS" || validation_failed=true
+    validate_boolean "CLEANUP_BUILD_CACHE" "$CLEANUP_BUILD_CACHE" || validation_failed=true
+    validate_boolean "QUIET" "$QUIET" || validation_failed=true
+    validate_boolean "DRY_RUN" "$DRY_RUN" || validation_failed=true
+
+    # Validate log settings
+    validate_log_level "$LOG_LEVEL" || validation_failed=true
+    validate_log_format "$LOG_FORMAT" || validation_failed=true
+
+    # Validate duration filters
+    if [ -n "${PRUNE_FILTER_UNTIL:-}" ]; then
+        validate_duration "PRUNE_FILTER_UNTIL" "$PRUNE_FILTER_UNTIL" || validation_failed=true
+    fi
+
+    # Check for conflicting settings
+    if [ "$PRUNE_VOLUMES" = "true" ] && [ "$CLEANUP_VOLUMES" = "false" ]; then
+        warn "PRUNE_VOLUMES is true but CLEANUP_VOLUMES is false - volumes will not be cleaned"
+    fi
+
+    # Check if at least one cleanup operation is enabled
+    if [ "$CLEANUP_CONTAINERS" = "false" ] && \
+       [ "$CLEANUP_IMAGES" = "false" ] && \
+       [ "$CLEANUP_VOLUMES" = "false" ] && \
+       [ "$CLEANUP_NETWORKS" = "false" ] && \
+       [ "$CLEANUP_BUILD_CACHE" = "false" ]; then
+        error "All cleanup operations are disabled - nothing to do"
+        validation_failed=true
+    fi
+
+    if [ "$validation_failed" = "true" ]; then
+        error "Configuration validation failed"
+        return 1
+    fi
+
+    debug "Configuration validation passed"
+    print_config_summary
+    return 0
+}
+
+# ============================================================================
+# CLEANUP FUNCTIONS
+# ============================================================================
 
 # Initialize counters
 TOTAL_SPACE_FREED=0
@@ -303,7 +579,10 @@ print_summary() {
     info "======================="
 }
 
-# Main execution
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
 main() {
     info "Docker Cleanup Container starting..."
 

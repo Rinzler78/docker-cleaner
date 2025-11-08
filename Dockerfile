@@ -11,11 +11,9 @@ RUN adduser -D -u 1000 -s /bin/bash cleanup-user && \
 # Copy scripts
 COPY src/entrypoint.sh /entrypoint.sh
 COPY src/cleanup.sh /app/cleanup.sh
-COPY src/logger.sh /app/logger.sh
-COPY src/config_validator.sh /app/config_validator.sh
 
 # Set permissions
-RUN chmod +x /entrypoint.sh /app/*.sh
+RUN chmod +x /entrypoint.sh /app/cleanup.sh
 
 # Default environment variables
 ENV DOCKER_SOCKET=/var/run/docker.sock \

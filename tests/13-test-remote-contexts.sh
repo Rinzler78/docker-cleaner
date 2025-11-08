@@ -3,6 +3,12 @@
 
 set -euo pipefail
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source context utilities
+source "${SCRIPT_DIR}/lib/context-utils.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -367,16 +373,77 @@ main() {
     local contexts_to_test=""
 
     if [ -n "$SPECIFIC_CONTEXT" ]; then
-        contexts_to_test="$SPECIFIC_CONTEXT"
-        echo "Testing specific context: $SPECIFIC_CONTEXT"
+        # Check if specific context is active
+        echo "Checking if requested context '$SPECIFIC_CONTEXT' is active..."
+        if is_context_active "$SPECIFIC_CONTEXT"; then
+            contexts_to_test="$SPECIFIC_CONTEXT"
+            echo -e "${GREEN}✓ Context is active: $SPECIFIC_CONTEXT${NC}"
+        else
+            echo -e "${RED}✗ Requested context '$SPECIFIC_CONTEXT' is NOT active${NC}"
+            echo ""
+            echo "Searching for an alternative active context..."
+
+            # Try to find any active context
+            local active_ctx
+            active_ctx=$(find_active_context "")
+            if [ $? -eq 0 ] && [ -n "$active_ctx" ]; then
+                contexts_to_test="$active_ctx"
+                echo -e "${YELLOW}⚠ Using alternative active context: $active_ctx${NC}"
+            else
+                echo -e "${RED}✗ No active contexts found${NC}"
+                echo ""
+                echo "Available contexts:"
+                docker context ls
+                return 1
+            fi
+        fi
     elif [ -n "$CONTEXTS_LIST" ]; then
-        contexts_to_test=$(echo "$CONTEXTS_LIST" | tr ',' ' ')
-        echo "Testing specified contexts: $CONTEXTS_LIST"
+        # Filter contexts list to only active ones
+        echo "Checking which contexts from list are active..."
+        local requested_contexts=$(echo "$CONTEXTS_LIST" | tr ',' ' ')
+        local active_contexts_found=""
+
+        for ctx in $requested_contexts; do
+            if is_context_active "$ctx"; then
+                echo -e "${GREEN}✓ Active: $ctx${NC}"
+                if [ -n "$active_contexts_found" ]; then
+                    active_contexts_found="$active_contexts_found $ctx"
+                else
+                    active_contexts_found="$ctx"
+                fi
+            else
+                echo -e "${YELLOW}⚠ Inactive (skipped): $ctx${NC}"
+            fi
+        done
+
+        if [ -z "$active_contexts_found" ]; then
+            echo -e "${RED}✗ None of the requested contexts are active${NC}"
+            return 1
+        fi
+
+        contexts_to_test="$active_contexts_found"
+        echo ""
+        echo "Testing active contexts: $active_contexts_found"
     else
-        # Detect all available contexts
-        contexts_to_test=$(docker context ls --format "{{.Name}}")
-        echo "Testing all available contexts:"
-        docker context ls
+        # Find all active remote contexts
+        echo "Searching for all active remote contexts..."
+        local active_contexts
+        active_contexts=$(find_all_active_contexts)
+        if [ $? -eq 0 ] && [ -n "$active_contexts" ]; then
+            contexts_to_test=$(echo "$active_contexts" | tr '\n' ' ')
+            echo -e "${GREEN}✓ Found active contexts:${NC}"
+            echo "$active_contexts" | while read -r ctx; do
+                echo "  - $ctx"
+            done
+        else
+            echo -e "${YELLOW}⚠ No active remote contexts found${NC}"
+            echo ""
+            echo "Available contexts:"
+            docker context ls
+            echo ""
+            echo -e "${YELLOW}Note: Remote context tests require at least one active remote context${NC}"
+            return 1
+        fi
     fi
 
     echo ""
